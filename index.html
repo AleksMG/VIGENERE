@@ -335,7 +335,7 @@
                 <div class="input-grid">
                     <div>
                         <label for="worker-count">Worker Count: <span class="tooltip">(?)
-                            <span class="tooltiptext">Number of parallel workers (default: 90% of CPU cores)</span>
+                            <span class="tooltiptext">Number of parallel workers (default: 900% of CPU cores)</span>
                         </span></label>
                         <input type="number" id="worker-count" value="0" min="1" max="32">
                     </div>
@@ -408,7 +408,7 @@
                 this.updateInterval = null;
                 this.lastUpdateTime = 0;
                 this.speedSamples = [];
-                this.maxSpeedSamples = 10;
+                this.maxSpeedSamples = 100;
                 this.workerTasks = new Map();
                 
                 this.initControls();
