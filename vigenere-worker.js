@@ -4,11 +4,11 @@ let ALPHABET_SIZE = 26;
 let ALPHABET_POSITIONS = {};
 let CIPHERTEXT_LENGTH = 0;
 let KNOWN_TEXT = "";
-let BATCH_SIZE = 50000;
+let BATCH_SIZE = 100000;
 let SCORE_THRESHOLD = 1.0;
 let WORKER_ID = 0;
 
-// English letter frequencies (percentages)
+// Precomputed frequency data
 const ENGLISH_FREQUENCIES = {
     'A': 8.167, 'B': 1.492, 'C': 2.782, 'D': 4.253,
     'E': 12.702, 'F': 2.228, 'G': 2.015, 'H': 6.094,
@@ -59,19 +59,21 @@ function initAlphabetPositions() {
 function vigenereDecrypt(ciphertext, key) {
     const keyLen = key.length;
     const plaintext = new Array(ciphertext.length);
+    const keyPositions = new Array(keyLen);
+    
+    // Precompute key positions
+    for (let i = 0; i < keyLen; i++) {
+        keyPositions[i] = ALPHABET_POSITIONS[key[i]];
+        if (keyPositions[i] === undefined) return ""; // Invalid key character
+    }
     
     for (let i = 0; i < ciphertext.length; i++) {
         const cipherChar = ciphertext[i];
-        const keyChar = key[i % keyLen];
-        
         const cipherPos = ALPHABET_POSITIONS[cipherChar];
-        const keyPos = ALPHABET_POSITIONS[keyChar];
-        
-        if (cipherPos === undefined || keyPos === undefined) {
-            return ""; // Invalid characters
-        }
+        if (cipherPos === undefined) return ""; // Invalid ciphertext character
         
         // Vigenère decryption formula: P = (C - K) mod alphabet_size
+        const keyPos = keyPositions[i % keyLen];
         let plainPos = (cipherPos - keyPos) % ALPHABET_SIZE;
         if (plainPos < 0) plainPos += ALPHABET_SIZE;
         
@@ -81,7 +83,14 @@ function vigenereDecrypt(ciphertext, key) {
     return plaintext.join('');
 }
 
-// More sophisticated scoring algorithm
+// Precompute word scores for faster matching
+const WORD_SCORES = {};
+COMMON_WORDS.forEach((word, index) => {
+    // Longer words and more common words get higher scores
+    WORD_SCORES[word] = 0.5 + (word.length * 0.3) + (index < 20 ? 0.5 : 0);
+});
+
+// More sophisticated scoring algorithm with optimizations
 function scoreText(text, known) {
     if (!text || text.length === 0) return 0;
     
@@ -90,13 +99,12 @@ function scoreText(text, known) {
     const textLen = upperText.length;
     
     // 1. Check for common words (highest weight)
-    for (const word of COMMON_WORDS) {
+    for (const word in WORD_SCORES) {
         if (word.length > textLen) continue;
         
         let pos = 0;
         while ((pos = upperText.indexOf(word, pos)) !== -1) {
-            // Longer words get more weight, common words get more weight
-            score += 0.5 + (word.length * 0.3) + (COMMON_WORDS.indexOf(word) < 20 ? 0.5 : 0);
+            score += WORD_SCORES[word];
             pos += word.length;
         }
     }
@@ -181,6 +189,7 @@ function scoreText(text, known) {
 function processBatch(ciphertext, keys) {
     const results = [];
     const startTime = performance.now();
+    const threshold = SCORE_THRESHOLD * 0.5; // Lower threshold for worker
     
     for (const key of keys) {
         const plaintext = vigenereDecrypt(ciphertext, key);
@@ -188,7 +197,7 @@ function processBatch(ciphertext, keys) {
         
         const score = scoreText(plaintext, KNOWN_TEXT);
         
-        if (score > SCORE_THRESHOLD * 0.5) { // Lower threshold for worker
+        if (score > threshold) {
             results.push({
                 key,
                 plaintext,
@@ -214,7 +223,7 @@ onmessage = function(e) {
         ALPHABET_SIZE = ALPHABET.length;
         CIPHERTEXT_LENGTH = e.data.ciphertextLength || 0;
         KNOWN_TEXT = e.data.knownText || "";
-        BATCH_SIZE = e.data.batchSize || 50000;
+        BATCH_SIZE = e.data.batchSize || 100000;
         SCORE_THRESHOLD = e.data.scoreThreshold || 1.0;
         WORKER_ID = e.data.workerId || 0;
         
