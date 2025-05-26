@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Military-Grade Vigenère Cipher Cracker v7.0</title>
+    <title>Military-Grade Vigenère Cipher Cracker v7.1</title>
     <style>
         :root {
             --bg: #0a0a12;
@@ -247,6 +247,34 @@
             display: block;
         }
         
+        .key-length-progress {
+            margin-top: 10px;
+        }
+        
+        .key-length-item {
+            margin-bottom: 5px;
+        }
+        
+        .key-length-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            margin-bottom: 3px;
+        }
+        
+        .key-length-bar {
+            height: 6px;
+            background: #2a2a3a;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .key-length-progress-bar {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+        }
+        
         @media (max-width: 768px) {
             .input-grid, .stats-grid {
                 grid-template-columns: 1fr;
@@ -257,7 +285,7 @@
 <body>
     <div class="container">
         <div class="panel">
-            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.0 ▪</h1>
+            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.1 ▪</h1>
             <p>Advanced brute-force attack system for decrypting Vigenère cipher messages without the key</p>
             
             <label for="ciphertext">Ciphertext:</label>
@@ -348,6 +376,9 @@
                     <div class="stat-value" id="total-keys">0</div>
                 </div>
             </div>
+
+            <h3>KEY LENGTH PROGRESS</h3>
+            <div class="key-length-progress" id="key-length-progress"></div>
 
             <h3>WORKER THREADS</h3>
             <div id="workers"></div>
@@ -513,6 +544,7 @@
                 this.updateStatus("INITIALIZING CRACKING SEQUENCE...");
                 document.getElementById('results').innerHTML = '';
                 document.getElementById('workers').innerHTML = '';
+                document.getElementById('key-length-progress').innerHTML = '';
                 document.getElementById('start').disabled = true;
                 document.getElementById('stop').disabled = false;
 
@@ -520,12 +552,34 @@
                 this.keyGenerator.init(alphabet, minKeyLength, maxKeyLength);
                 document.getElementById('total-keys').textContent = this.keyGenerator.totalKeys.toLocaleString();
 
+                // Create key length progress bars
+                this.createKeyLengthProgressBars(minKeyLength, maxKeyLength);
+
                 // Create workers
                 const workerCount = this.getWorkerCount();
                 await this.createWorkers(workerCount, ciphertext, knownText, alphabet);
 
                 // Start monitoring
                 this.updateInterval = setInterval(() => this.updateDashboard(), 250);
+            }
+
+            createKeyLengthProgressBars(minLen, maxLen) {
+                const container = document.getElementById('key-length-progress');
+                
+                for (let len = minLen; len <= maxLen; len++) {
+                    const div = document.createElement('div');
+                    div.className = 'key-length-item';
+                    div.innerHTML = `
+                        <div class="key-length-label">
+                            <span>Length ${len}</span>
+                            <span id="key-length-${len}-count">0</span>
+                        </div>
+                        <div class="key-length-bar">
+                            <div class="key-length-progress-bar" id="key-length-${len}-progress"></div>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                }
             }
 
             async createWorkers(count, ciphertext, knownText, alphabet) {
@@ -765,6 +819,16 @@
                     if (keysEl) keysEl.textContent = `${this.workerKeysTested.get(i) || 0} keys`;
                 });
                 
+                // Update key length progress
+                this.keyGenerator.keysByLength.forEach(lengthInfo => {
+                    const progress = (lengthInfo.nextIndex / lengthInfo.keysTotal) * 100;
+                    const progressBar = document.getElementById(`key-length-${lengthInfo.length}-progress`);
+                    const countEl = document.getElementById(`key-length-${lengthInfo.length}-count`);
+                    
+                    if (progressBar) progressBar.style.width = `${progress}%`;
+                    if (countEl) countEl.textContent = `${lengthInfo.nextIndex.toLocaleString()}/${lengthInfo.keysTotal.toLocaleString()}`;
+                });
+                
                 this.lastUpdateTime = now;
             }
 
@@ -781,8 +845,16 @@
             }
 
             checkCompletion() {
-                const allDone = this.keyGenerator.currentIndex >= this.keyGenerator.totalKeys;
-                if (allDone) {
+                // Check if all key lengths are completed
+                const allLengthsCompleted = this.keyGenerator.keysByLength.every(
+                    lengthInfo => lengthInfo.nextIndex >= lengthInfo.keysTotal
+                );
+                
+                // Check if all workers have finished their current batches
+                const allWorkersIdle = Array.from(this.workerKeysTested.values())
+                    .every(keys => keys >= this.keyGenerator.totalKeys / this.workers.length * 0.9);
+
+                if (allLengthsCompleted && allWorkersIdle) {
                     this.stopAttack();
                     this.updateStatus("CRACKING SEQUENCE COMPLETE");
                     
