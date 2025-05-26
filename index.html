@@ -371,7 +371,8 @@
                 this.startTime = 0;
                 this.isRunning = false;
                 this.topResults = [];
-                this.workerSpeeds = [];
+                this.workerSpeeds = new Map();
+                this.workerKeysTested = new Map();
                 this.keyGenerator = new KeyGenerator();
                 this.updateInterval = null;
                 this.lastUpdateTime = 0;
@@ -432,7 +433,7 @@
                     const uniqueChars = [...new Set(customAlphabet.split(''))].sort();
                     return uniqueChars.join('');
                 }
-                return "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; // Standard A-Z
+                return "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             }
 
             validateAlphabet(alphabet) {
@@ -465,7 +466,7 @@
                 return parseFloat(document.getElementById('score-threshold').value) || 1.0;
             }
 
-            startAttack() {
+            async startAttack() {
                 // Validate input
                 const ciphertext = document.getElementById('ciphertext').value.trim().replace(/\s+/g, '').toUpperCase();
                 const knownText = document.getElementById('known-text').value.toUpperCase();
@@ -503,7 +504,8 @@
                 this.keysTested = 0;
                 this.startTime = Date.now();
                 this.topResults = [];
-                this.workerSpeeds = [];
+                this.workerSpeeds = new Map();
+                this.workerKeysTested = new Map();
                 this.speedSamples = [];
                 this.lastUpdateTime = this.startTime;
                 
@@ -520,80 +522,97 @@
 
                 // Create workers
                 const workerCount = this.getWorkerCount();
-                this.createWorkers(workerCount, ciphertext, knownText, alphabet);
+                await this.createWorkers(workerCount, ciphertext, knownText, alphabet);
 
                 // Start monitoring
                 this.updateInterval = setInterval(() => this.updateDashboard(), 250);
             }
 
-            createWorkers(count, ciphertext, knownText, alphabet) {
+            async createWorkers(count, ciphertext, knownText, alphabet) {
                 this.workers = [];
+                this.workerSpeeds = new Map();
+                this.workerKeysTested = new Map();
                 const workerContainer = document.getElementById('workers');
+                workerContainer.innerHTML = '';
+
+                const batchSize = this.getBatchSize();
+                const scoreThreshold = this.getScoreThreshold();
 
                 for (let i = 0; i < count; i++) {
-                    // Create worker with proper external file
-                    const worker = new Worker('vigenere-worker.js');
-                    
-                    // Initialize worker with current parameters
-                    worker.postMessage({
-                        type: 'init',
-                        alphabet: alphabet,
-                        ciphertextLength: ciphertext.length,
-                        knownText: knownText
-                    });
+                    try {
+                        const worker = new Worker('vigenere-worker.js');
+                        
+                        worker.postMessage({
+                            type: 'init',
+                            workerId: i,
+                            alphabet: alphabet,
+                            ciphertextLength: ciphertext.length,
+                            knownText: knownText,
+                            batchSize: batchSize,
+                            scoreThreshold: scoreThreshold
+                        });
 
-                    worker.onmessage = (e) => {
-                        if (!this.isRunning) return;
+                        worker.onmessage = (e) => {
+                            if (!this.isRunning) return;
+                            
+                            const { keysTested, results, currentSpeed, workerId } = e.data;
+                            
+                            // Update worker-specific metrics
+                            this.workerSpeeds.set(workerId, currentSpeed || 0);
+                            this.workerKeysTested.set(workerId, (this.workerKeysTested.get(workerId) || 0) + keysTested);
+                            
+                            // Aggregate results
+                            this.keysTested += keysTested;
+                            
+                            if (results && results.length > 0) {
+                                this.processResults(results);
+                            }
+                            
+                            // Assign more work
+                            this.assignWork(workerId, ciphertext);
+                        };
+
+                        worker.onerror = (e) => {
+                            console.error(`Worker ${i} error:`, e);
+                            this.updateStatus(`Worker ${i+1} encountered an error`, true);
+                        };
+
+                        this.workers[i] = worker;
+                        this.workerSpeeds.set(i, 0);
+                        this.workerKeysTested.set(i, 0);
                         
-                        const { keysTested, results, currentSpeed } = e.data;
-                        this.keysTested += keysTested;
-                        this.workerSpeeds[i] = currentSpeed || 0;
-                        
-                        // Process results
-                        if (results && results.length > 0) {
-                            this.processResults(results);
-                        }
-                        
-                        // Assign more work
+                        // Create worker UI
+                        const workerEl = document.createElement('div');
+                        workerEl.className = 'worker';
+                        workerEl.innerHTML = `
+                            <span>WORKER ${i+1}</span>
+                            <div class="worker-progress">
+                                <div class="progress-bar" id="worker-${i}-progress" style="width:0%"></div>
+                            </div>
+                            <span id="worker-${i}-speed">0 keys/s</span>
+                            <span id="worker-${i}-keys">0 keys</span>
+                        `;
+                        workerContainer.appendChild(workerEl);
+
+                        // Start first batch
                         this.assignWork(i, ciphertext);
-                    };
-
-                    worker.onerror = (e) => {
-                        console.error(`Worker ${i} error:`, e);
-                        this.updateStatus(`Worker ${i+1} encountered an error`, true);
-                    };
-
-                    this.workers.push(worker);
-                    this.workerSpeeds[i] = 0;
-                    
-                    // Create worker UI
-                    const workerEl = document.createElement('div');
-                    workerEl.className = 'worker';
-                    workerEl.innerHTML = `
-                        <span>WORKER ${i+1}</span>
-                        <div class="worker-progress">
-                            <div class="progress-bar" id="worker-${i}-progress" style="width:0%"></div>
-                        </div>
-                        <span id="worker-${i}-speed">0 keys/s</span>
-                    `;
-                    workerContainer.appendChild(workerEl);
-
-                    // Start first batch
-                    this.assignWork(i, ciphertext);
+                    } catch (e) {
+                        console.error(`Failed to create worker ${i}:`, e);
+                    }
                 }
             }
 
             assignWork(workerId, ciphertext) {
-                if (!this.isRunning || workerId >= this.workers.length) return;
+                if (!this.isRunning || !this.workers[workerId]) return;
                 
-                const batchSize = this.getBatchSize();
-                const batch = this.keyGenerator.getNextBatch(batchSize);
+                const batch = this.keyGenerator.getNextBatchForWorker(workerId, this.getBatchSize());
                 
                 if (batch.length > 0) {
                     this.workers[workerId].postMessage({
                         type: 'process',
                         ciphertext: ciphertext,
-                        keys: batch
+                        keys: batch,
+                        workerId: workerId
                     });
                 } else {
                     this.checkCompletion();
@@ -607,16 +626,12 @@
                 const now = Date.now();
                 
                 results.forEach(result => {
-                    // Convert score to number if it's a string
                     const score = typeof result.score === 'string' ? parseFloat(result.score) : result.score;
                     
-                    // Only add results with score > threshold or if we have less than 15 results
                     if (score > threshold || this.topResults.length < 15) {
-                        // Check if this key already exists in results
                         const existingIndex = this.topResults.findIndex(r => r.key === result.key);
                         
                         if (existingIndex >= 0) {
-                            // Update if this score is better
                             if (score > this.topResults[existingIndex].score) {
                                 this.topResults[existingIndex] = {
                                     key: result.key,
@@ -634,13 +649,11 @@
                             });
                         }
                         
-                        // Sort by score descending, then by recency
                         this.topResults.sort((a, b) => {
                             if (b.score !== a.score) return b.score - a.score;
                             return b.timestamp - a.timestamp;
                         });
                         
-                        // Keep only top 15 results
                         if (this.topResults.length > 15) {
                             this.topResults.pop();
                         }
@@ -668,28 +681,23 @@
                 const container = document.getElementById('results');
                 const knownText = document.getElementById('known-text').value.toUpperCase();
                 
-                // Only update if we have results to avoid flickering
                 if (this.topResults.length === 0) return;
                 
-                // Create fragment for batch update
                 const fragment = document.createDocumentFragment();
                 
                 this.topResults.forEach((result, index) => {
                     const div = document.createElement('div');
                     div.className = 'result';
                     
-                    // Highlight the top result
                     if (index === 0 && result.score > 1.0) {
                         div.style.borderLeftColor = 'var(--warning)';
                         div.style.background = 'rgba(255, 158, 0, 0.1)';
                     }
                     
-                    // Truncate long plaintext with ellipsis
                     const displayText = result.plaintext.length > 100 
                         ? result.plaintext.substring(0, 100) + '...' 
                         : result.plaintext;
                     
-                    // Highlight known text matches
                     const highlightedText = this.highlightMatches(displayText, knownText);
                     
                     div.innerHTML = `
@@ -701,7 +709,6 @@
                     fragment.appendChild(div);
                 });
                 
-                // Batch update the DOM
                 container.innerHTML = '';
                 container.appendChild(fragment);
             }
@@ -710,11 +717,17 @@
                 if (!this.isRunning) return;
                 
                 const now = Date.now();
-                const timeElapsed = (now - this.lastUpdateTime) / 1000; // in seconds
+                const timeElapsed = (now - this.lastUpdateTime) / 1000;
                 
-                // Calculate overall speed
-                const totalSpeed = this.workerSpeeds.reduce((sum, speed) => sum + speed, 0);
-                const avgSpeed = this.workers.length > 0 ? Math.round(totalSpeed / this.workers.length) : 0;
+                // Calculate total speed from all workers
+                let totalSpeed = 0;
+                let totalKeys = 0;
+                this.workerSpeeds.forEach((speed, workerId) => {
+                    totalSpeed += speed;
+                    totalKeys += this.workerKeysTested.get(workerId) || 0;
+                });
+                
+                this.keysTested = totalKeys;
                 
                 // Update speed samples for smoothing
                 if (totalSpeed > 0) {
@@ -731,7 +744,7 @@
                 
                 // Update UI
                 document.getElementById('keys-tried').textContent = this.keysTested.toLocaleString();
-                document.getElementById('speed').textContent = `${smoothedSpeed.toLocaleString()} keys/sec (avg ${avgSpeed.toLocaleString()}/worker)`;
+                document.getElementById('speed').textContent = `${smoothedSpeed.toLocaleString()} keys/sec`;
                 
                 // Update ETA
                 if (smoothedSpeed > 0) {
@@ -740,14 +753,16 @@
                     document.getElementById('eta').textContent = this.formatTime(etaSeconds);
                 }
                 
-                // Update worker progress
+                // Update worker progress and stats
                 this.workers.forEach((worker, i) => {
-                    const progress = (this.keyGenerator.currentIndex / this.keyGenerator.totalKeys) * 100;
+                    const progress = ((this.workerKeysTested.get(i) || 0) / this.keyGenerator.totalKeys) * 100;
                     const progressBar = document.getElementById(`worker-${i}-progress`);
                     const speedEl = document.getElementById(`worker-${i}-speed`);
+                    const keysEl = document.getElementById(`worker-${i}-keys`);
                     
                     if (progressBar) progressBar.style.width = `${progress}%`;
-                    if (speedEl) speedEl.textContent = `${this.workerSpeeds[i].toLocaleString()} keys/s`;
+                    if (speedEl) speedEl.textContent = `${this.workerSpeeds.get(i) || 0} keys/s`;
+                    if (keysEl) keysEl.textContent = `${this.workerKeysTested.get(i) || 0} keys`;
                 });
                 
                 this.lastUpdateTime = now;
@@ -824,67 +839,86 @@
                 this.alphabet = "";
                 this.minKeyLength = 0;
                 this.maxKeyLength = 0;
-                this.currentIndex = 0;
                 this.totalKeys = 0;
-                this.currentLength = 0;
-                this.lengthStartIndex = 0;
-                this.keysByLength = [];
+                this.currentIndex = 0;
                 this.alphabetSize = 0;
+                this.workerAssignments = new Map();
+                this.keysByLength = [];
             }
 
             init(alphabet, minKeyLength, maxKeyLength) {
                 this.alphabet = alphabet;
                 this.minKeyLength = minKeyLength;
                 this.maxKeyLength = maxKeyLength;
-                this.currentIndex = 0;
-                this.currentLength = minKeyLength;
-                this.lengthStartIndex = 0;
                 this.alphabetSize = alphabet.length;
-                
-                // Precompute keys by length
+                this.workerAssignments = new Map();
                 this.keysByLength = [];
                 this.totalKeys = 0;
+                this.currentIndex = 0;
                 
+                // Precompute keys by length
                 for (let len = minKeyLength; len <= maxKeyLength; len++) {
                     const keysAtLength = Math.pow(this.alphabetSize, len);
                     this.keysByLength.push({
                         length: len,
                         startIndex: this.totalKeys,
-                        endIndex: this.totalKeys + keysAtLength - 1
+                        endIndex: this.totalKeys + keysAtLength - 1,
+                        keysTotal: keysAtLength,
+                        nextIndex: 0
                     });
                     this.totalKeys += keysAtLength;
                 }
             }
 
-            getNextBatch(size) {
-                const batch = [];
-                const remaining = Math.min(size, this.totalKeys - this.currentIndex);
-                
-                if (remaining <= 0) return batch;
-                
-                // Generate keys in batches for better performance
-                for (let i = 0; i < remaining; i++) {
-                    batch.push(this.generateKey(this.currentIndex + i));
+            getNextBatchForWorker(workerId, batchSize) {
+                if (!this.workerAssignments.has(workerId)) {
+                    // Assign this worker to a specific key length
+                    const lengthIndex = workerId % this.keysByLength.length;
+                    this.workerAssignments.set(workerId, {
+                        lengthIndex,
+                        nextIndex: this.keysByLength[lengthIndex].nextIndex
+                    });
                 }
                 
-                this.currentIndex += remaining;
+                const assignment = this.workerAssignments.get(workerId);
+                const lengthInfo = this.keysByLength[assignment.lengthIndex];
+                const remaining = lengthInfo.keysTotal - assignment.nextIndex;
+                
+                if (remaining <= 0) {
+                    // This worker finished its key length, find next available
+                    for (let i = 0; i < this.keysByLength.length; i++) {
+                        const li = this.keysByLength[i];
+                        if (li.nextIndex < li.keysTotal) {
+                            assignment.lengthIndex = i;
+                            assignment.nextIndex = li.nextIndex;
+                            break;
+                        }
+                    }
+                }
+                
+                const actualBatchSize = Math.min(batchSize, lengthInfo.keysTotal - assignment.nextIndex);
+                if (actualBatchSize <= 0) return [];
+                
+                const batch = [];
+                const startIdx = assignment.nextIndex;
+                const endIdx = startIdx + actualBatchSize;
+                
+                for (let i = startIdx; i < endIdx; i++) {
+                    batch.push(this.generateKeyForLength(lengthInfo.length, i));
+                }
+                
+                assignment.nextIndex = endIdx;
+                lengthInfo.nextIndex = endIdx;
+                this.currentIndex += actualBatchSize;
+                
                 return batch;
             }
 
-            generateKey(index) {
-                // Find which length range this index falls into
-                const lengthInfo = this.keysByLength.find(range => 
-                    index >= range.startIndex && index <= range.endIndex
-                );
-                
-                if (!lengthInfo) return "";
-                
-                const len = lengthInfo.length;
-                const relativeIndex = index - lengthInfo.startIndex;
+            generateKeyForLength(length, index) {
                 let key = "";
-                let remaining = relativeIndex;
+                let remaining = index;
                 
-                for (let i = 0; i < len; i++) {
+                for (let i = 0; i < length; i++) {
                     const pos = remaining % this.alphabetSize;
                     key = this.alphabet.charAt(pos) + key;
                     remaining = Math.floor(remaining / this.alphabetSize);
