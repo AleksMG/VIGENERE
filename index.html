@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Military-Grade Vigenère Cipher Cracker v7.1</title>
+    <title>Military-Grade Vigenère Cipher Cracker v7.2</title>
     <style>
         :root {
             --bg: #0a0a12;
@@ -285,7 +285,7 @@
 <body>
     <div class="container">
         <div class="panel">
-            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.1 ▪</h1>
+            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.2 ▪</h1>
             <p>Advanced brute-force attack system for decrypting Vigenère cipher messages without the key</p>
             
             <label for="ciphertext">Ciphertext:</label>
@@ -329,7 +329,7 @@
                         <label for="batch-size">Worker Batch Size: <span class="tooltip">(?)
                             <span class="tooltiptext">Keys per batch per worker (adjust for performance)</span>
                         </span></label>
-                        <input type="number" id="batch-size" value="50000" min="1000" max="500000">
+                        <input type="number" id="batch-size" value="100000" min="1000" max="500000">
                     </div>
                 </div>
                 <div class="input-grid">
@@ -409,6 +409,7 @@
                 this.lastUpdateTime = 0;
                 this.speedSamples = [];
                 this.maxSpeedSamples = 10;
+                this.workerTasks = new Map();
                 
                 this.initControls();
                 this.initPerformanceWarning();
@@ -490,7 +491,7 @@
             }
 
             getBatchSize() {
-                return parseInt(document.getElementById('batch-size').value) || 50000;
+                return parseInt(document.getElementById('batch-size').value) || 100000;
             }
 
             getScoreThreshold() {
@@ -539,6 +540,7 @@
                 this.workerKeysTested = new Map();
                 this.speedSamples = [];
                 this.lastUpdateTime = this.startTime;
+                this.workerTasks = new Map();
                 
                 // Update UI
                 this.updateStatus("INITIALIZING CRACKING SEQUENCE...");
@@ -586,6 +588,7 @@
                 this.workers = [];
                 this.workerSpeeds = new Map();
                 this.workerKeysTested = new Map();
+                this.workerTasks = new Map();
                 const workerContainer = document.getElementById('workers');
                 workerContainer.innerHTML = '';
 
@@ -595,6 +598,7 @@
                 for (let i = 0; i < count; i++) {
                     try {
                         const worker = new Worker('vigenere-worker.js');
+                        this.workerTasks.set(i, false); // Mark worker as idle
                         
                         worker.postMessage({
                             type: 'init',
@@ -622,6 +626,9 @@
                                 this.processResults(results);
                             }
                             
+                            // Mark worker as idle
+                            this.workerTasks.set(workerId, false);
+                            
                             // Assign more work
                             this.assignWork(workerId, ciphertext);
                         };
@@ -629,6 +636,7 @@
                         worker.onerror = (e) => {
                             console.error(`Worker ${i} error:`, e);
                             this.updateStatus(`Worker ${i+1} encountered an error`, true);
+                            this.workerTasks.set(i, false); // Mark as idle even on error
                         };
 
                         this.workers[i] = worker;
@@ -657,11 +665,14 @@
             }
 
             assignWork(workerId, ciphertext) {
-                if (!this.isRunning || !this.workers[workerId]) return;
+                if (!this.isRunning || !this.workers[workerId] || this.workerTasks.get(workerId)) {
+                    return; // Worker is busy or not available
+                }
                 
                 const batch = this.keyGenerator.getNextBatchForWorker(workerId, this.getBatchSize());
                 
                 if (batch.length > 0) {
+                    this.workerTasks.set(workerId, true); // Mark worker as busy
                     this.workers[workerId].postMessage({
                         type: 'process',
                         ciphertext: ciphertext,
@@ -850,9 +861,8 @@
                     lengthInfo => lengthInfo.nextIndex >= lengthInfo.keysTotal
                 );
                 
-                // Check if all workers have finished their current batches
-                const allWorkersIdle = Array.from(this.workerKeysTested.values())
-                    .every(keys => keys >= this.keyGenerator.totalKeys / this.workers.length * 0.9);
+                // Check if all workers are idle
+                const allWorkersIdle = Array.from(this.workerTasks.values()).every(busy => !busy);
 
                 if (allLengthsCompleted && allWorkersIdle) {
                     this.stopAttack();
