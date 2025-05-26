@@ -1,3 +1,13 @@
+// Worker state
+let ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+let ALPHABET_SIZE = 26;
+let ALPHABET_POSITIONS = {};
+let CIPHERTEXT_LENGTH = 0;
+let KNOWN_TEXT = "";
+let BATCH_SIZE = 50000;
+let SCORE_THRESHOLD = 1.0;
+let WORKER_ID = 0;
+
 // English letter frequencies (percentages)
 const ENGLISH_FREQUENCIES = {
     'A': 8.167, 'B': 1.492, 'C': 2.782, 'D': 4.253,
@@ -11,11 +21,16 @@ const ENGLISH_FREQUENCIES = {
 
 // Common words dictionary (frequency sorted)
 const COMMON_WORDS = [
+    'THE', 'BE', 'TO', 'OF', 'AND', 'A', 'IN', 'THAT', 'HAVE', 'I',
+    'IT', 'FOR', 'NOT', 'ON', 'WITH', 'HE', 'AS', 'YOU', 'DO', 'AT',
+    'THIS', 'BUT', 'HIS', 'BY', 'FROM', 'THEY', 'WE', 'SAY', 'HER', 'SHE',
+    'OR', 'AN', 'WILL', 'MY', 'ONE', 'ALL', 'WOULD', 'THERE', 'THEIR', 'WHAT',
+    'SO', 'UP', 'OUT', 'IF', 'ABOUT', 'WHO', 'GET', 'WHICH', 'GO', 'ME',
     'WHEN', 'MAKE', 'CAN', 'LIKE', 'TIME', 'NO', 'JUST', 'HIM', 'KNOW', 'TAKE',
     'PEOPLE', 'INTO', 'YEAR', 'YOUR', 'GOOD', 'SOME', 'COULD', 'THEM', 'SEE', 'OTHER',
     'THAN', 'THEN', 'NOW', 'LOOK', 'ONLY', 'COME', 'ITS', 'OVER', 'THINK', 'ALSO',
-    'BACK', 'AFTER', 'USE', 'TWO', 'HOW', 'OUR', 'WORK', 'FIRST', 'WALL', 'WAY',
-    'EVEN', 'NEW', 'WANT', 'BECAUSE', 'ANY', 'THESE', 'GIVE', 'DAY', 'MOST'
+    'BACK', 'AFTER', 'USE', 'TWO', 'HOW', 'OUR', 'WORK', 'FIRST', 'WELL', 'WAY',
+    'EVEN', 'NEW', 'WANT', 'BECAUSE', 'ANY', 'THESE', 'GIVE', 'DAY', 'MOST', 'US'
 ];
 
 // Common bigrams (2-letter combinations)
@@ -31,12 +46,6 @@ const COMMON_TRIGRAMS = [
     'THE', 'AND', 'ING', 'HER', 'HAT', 'HIS', 'THA', 'ERE', 'FOR', 'ENT',
     'ION', 'TER', 'WAS', 'YOU', 'ITH', 'VER', 'ALL', 'WIT', 'THI', 'TIO'
 ];
-
-let ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-let ALPHABET_SIZE = 26;
-let ALPHABET_POSITIONS = {};
-let CIPHERTEXT_LENGTH = 0;
-let KNOWN_TEXT = "";
 
 // Initialize alphabet positions
 function initAlphabetPositions() {
@@ -70,20 +79,6 @@ function vigenereDecrypt(ciphertext, key) {
     }
     
     return plaintext.join('');
-}
-
-function highlightMatches(text, known) {
-    if (!known || known.trim() === '') return text;
-    
-    const fragments = known.split(',').map(f => f.trim()).filter(f => f.length > 0);
-    let result = text;
-    
-    for (const fragment of fragments) {
-        const regex = new RegExp(fragment, 'gi');
-        result = result.replace(regex, match => `<span class="highlight">${match}</span>`);
-    }
-    
-    return result;
 }
 
 // More sophisticated scoring algorithm
@@ -183,44 +178,56 @@ function scoreText(text, known) {
     return Math.max(0, score);
 }
 
+function processBatch(ciphertext, keys) {
+    const results = [];
+    const startTime = performance.now();
+    
+    for (const key of keys) {
+        const plaintext = vigenereDecrypt(ciphertext, key);
+        if (!plaintext) continue;
+        
+        const score = scoreText(plaintext, KNOWN_TEXT);
+        
+        if (score > SCORE_THRESHOLD * 0.5) { // Lower threshold for worker
+            results.push({
+                key,
+                plaintext,
+                score: parseFloat(score.toFixed(2))
+            });
+        }
+    }
+    
+    const batchTime = performance.now() - startTime;
+    const currentSpeed = batchTime > 0 ? Math.round((keys.length / batchTime) * 1000) : 0;
+    
+    return {
+        keysTested: keys.length,
+        results,
+        currentSpeed
+    };
+}
+
 onmessage = function(e) {
     if (e.data.type === 'init') {
-        // Initialize worker with parameters
+        // Initialize worker with parameters from main thread
         ALPHABET = e.data.alphabet || "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         ALPHABET_SIZE = ALPHABET.length;
         CIPHERTEXT_LENGTH = e.data.ciphertextLength || 0;
         KNOWN_TEXT = e.data.knownText || "";
+        BATCH_SIZE = e.data.batchSize || 50000;
+        SCORE_THRESHOLD = e.data.scoreThreshold || 1.0;
+        WORKER_ID = e.data.workerId || 0;
+        
+        // Initialize alphabet positions
         initAlphabetPositions();
         return;
     }
 
     if (e.data.type === 'process') {
-        const { ciphertext, keys } = e.data;
-        const results = [];
-        const startTime = performance.now();
-        
-        for (const key of keys) {
-            const plaintext = vigenereDecrypt(ciphertext, key);
-            if (!plaintext) continue;
-            
-            const score = scoreText(plaintext, KNOWN_TEXT);
-            
-            if (score > 0.5) { // Lower threshold to catch more potential matches
-                results.push({
-                    key,
-                    plaintext,
-                    score: parseFloat(score.toFixed(2))
-                });
-            }
-        }
-        
-        const batchTime = performance.now() - startTime;
-        const currentSpeed = batchTime > 0 ? Math.round((keys.length / batchTime) * 1000) : 0;
-        
+        const result = processBatch(e.data.ciphertext, e.data.keys);
         postMessage({
-            keysTested: keys.length,
-            results,
-            currentSpeed
+            ...result,
+            workerId: WORKER_ID
         });
     }
 };
