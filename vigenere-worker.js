@@ -452,6 +452,7 @@ function processBatch(ciphertext, keys) {
     };
 }
 
+// Main message handler
 onmessage = function(e) {
     if (e.data.type === 'init') {
         ALPHABET = e.data.alphabet || "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
