@@ -1,556 +1,328 @@
-// Worker state
+// === HIGH-PERFORMANCE VIGENÈRE WORKER ===
+// Оптимизации: early-exit, typed arrays, minimal allocations, precomputed tables
+
 let ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 let ALPHABET_SIZE = 26;
-let ALPHABET_POSITIONS = {};
-let ALPHABET_POS_ARRAY = new Uint8Array(256);
+let POS_ARRAY = new Int8Array(256); // -1 = invalid
 let CIPHERTEXT = "";
-let CIPHERTEXT_LENGTH = 0;
-let KNOWN_TEXT = "";
+let CT_CODES = null; // Uint8Array с кодами символов
+let KNOWN_FRAGMENTS = [];
 let BATCH_SIZE = 100000;
 let SCORE_THRESHOLD = 1.0;
 let WORKER_ID = 0;
-let TEST_SPECIFIC_KEYS = [];
+let TEST_KEYS = [];
 
-let KNOWN_FRAGMENTS = [];
-let KNOWN_REGEX = null;
+// === PRECOMPUTED TABLES ===
+const BIGRAM_SCORES = new Float32Array(676); // 26*26
+const TRIGRAM_SCORES = new Float32Array(17576); // 26^3
+const WORD_SCORES = new Map();
 
-const ENGLISH_FREQUENCIES = {
-    'A': 8.167, 'B': 1.492, 'C': 2.782, 'D': 4.253,
-    'E': 12.702, 'F': 2.228, 'G': 2.015, 'H': 6.094,
-    'I': 6.966, 'J': 0.153, 'K': 0.772, 'L': 4.025,
-    'M': 2.406, 'N': 6.749, 'O': 7.507, 'P': 1.929,
-    'Q': 0.095, 'R': 5.987, 'S': 6.327, 'T': 9.056,
-    'U': 2.758, 'V': 0.978, 'W': 2.360, 'X': 0.150,
-    'Y': 1.974, 'Z': 0.074
-};
-
-const COMMON_WORDS = [
-    'THE', 'BE', 'TO', 'OF', 'AND', 'A', 'IN', 'THAT', 'HAVE', 'I',
-    'IT', 'FOR', 'NOT', 'ON', 'WITH', 'HE', 'AS', 'YOU', 'DO', 'AT',
-    'THIS', 'BUT', 'HIS', 'BY', 'FROM', 'THEY', 'WE', 'SAY', 'HER', 'SHE',
-    'OR', 'AN', 'WILL', 'MY', 'ONE', 'ALL', 'WOULD', 'THERE', 'THEIR', 'WHAT',
-    'SO', 'UP', 'OUT', 'IF', 'ABOUT', 'WHO', 'GET', 'WHICH', 'GO', 'ME',
-    'WHEN', 'MAKE', 'CAN', 'LIKE', 'TIME', 'NO', 'JUST', 'HIM', 'KNOW', 'TAKE',
-    'PEOPLE', 'INTO', 'YEAR', 'YOUR', 'GOOD', 'SOME', 'COULD', 'THEM', 'SEE', 'OTHER',
-    'THAN', 'THEN', 'NOW', 'LOOK', 'ONLY', 'COME', 'ITS', 'OVER', 'THINK', 'ALSO',
-    'BACK', 'AFTER', 'USE', 'TWO', 'HOW', 'OUR', 'WORK', 'FIRST', 'WELL', 'WAY',
-    'EVEN', 'NEW', 'WANT', 'BECAUSE', 'ANY', 'THESE', 'GIVE', 'DAY', 'MOST', 'US'
-];
-
-const COMMON_BIGRAMS = [
-    'TH', 'HE', 'IN', 'ER', 'AN', 'RE', 'ND', 'AT', 'ON', 'NT',
-    'HA', 'ES', 'ST', 'EN', 'ED', 'TO', 'IT', 'OU', 'EA', 'HI',
-    'IS', 'OR', 'TI', 'AS', 'TE', 'ET', 'NG', 'OF', 'AL', 'DE',
-    'SE', 'LE', 'SA', 'SI', 'AR', 'VE', 'RA', 'LD', 'UR'
-];
-
-const COMMON_TRIGRAMS = [
-    'THE', 'AND', 'ING', 'HER', 'HAT', 'HIS', 'THA', 'ERE', 'FOR', 'ENT',
-    'ION', 'TER', 'WAS', 'YOU', 'ITH', 'VER', 'ALL', 'WIT', 'THI', 'TIO'
-];
-const WORD_SCORES = {};
-COMMON_WORDS.forEach((word, index) => {
-    WORD_SCORES[word] = 0.5 + (word.length * 0.3) + (index < 20 ? 0.5 : 0);
-});
-
-// === PATTERN ENGINE — ищет проблемы в ТЕКСТЕ ===
-const PatternEngine = (() => {
-    const SCAN_LIMIT = 64;
-    const vowels = new Set('AEIOU');
-    
-    return {
-        detect(text) {
-            const patterns = [];
-            if (!text || text.length === 0) return patterns;
-            
-            const scanText = text.slice(0, SCAN_LIMIT);
-            const len = scanText.length;
-            
-            for (let i = 0; i < len - 3; i++) {
-                if (scanText[i] === scanText[i+3] && scanText[i+1] === scanText[i+4]) {
-                    patterns.push({ type: 'repeat', seq: scanText.slice(i, i+3), pos: i });
-                    break;
-                }
-            }
-            
-            for (let i = 0; i < len - 3; i++) {
-                if (scanText[i] === scanText[i+3] && scanText[i+1] === scanText[i+2]) {
-                    patterns.push({ type: 'palindrome', seq: scanText.slice(i, i+4), pos: i, len: 4 });
-                    break;
-                }
-            }
-            
-            for (let i = 0; i < len - 4; i++) {
-                const sub = scanText.slice(i, i+5);
-                if (sub === sub.split('').reverse().join('')) {
-                    patterns.push({ type: 'palindrome_long', seq: sub, pos: i, len: 5 });
-                    break;
-                }
-            }
-            
-            let vCount = 0;
-            for (let i = 0; i < SCAN_LIMIT && i < text.length; i++) {
-                if (vowels.has(text[i])) vCount++;
-            }
-            const total = Math.min(SCAN_LIMIT, text.length);
-            if (total > 0) {
-                const vRatio = vCount / total;
-                if (vRatio > 0.55) {
-                    patterns.push({ type: 'vc_high', ratio: vRatio });                } else if (vRatio < 0.25) {
-                    patterns.push({ type: 'vc_low', ratio: vRatio });
-                }
-            }
-            
-            for (let i = 2; i < len; i++) {
-                if (scanText[i] === scanText[i-1] && scanText[i] === scanText[i-2]) {
-                    patterns.push({ type: 'cluster', char: scanText[i], pos: i });
-                    break;
-                }
-            }
-            
-            if (KNOWN_REGEX && KNOWN_FRAGMENTS.length > 0) {
-                for (const frag of KNOWN_FRAGMENTS) {
-                    const idx = text.toUpperCase().indexOf(frag);
-                    if (idx !== -1) {
-                        const before = text.slice(Math.max(0, idx - 5), idx);
-                        const after = text.slice(idx + frag.length, idx + frag.length + 5);
-                        const context = before + after;
-                        if (context.length > 0) {
-                            let noise = 0;
-                            for (const c of context) {
-                                if (ALPHABET_POS_ARRAY[c.charCodeAt(0)] === 255) noise++;
-                            }
-                            if (noise / context.length > 0.3) {
-                                patterns.push({ type: 'known_bad_context', frag, pos: idx });
-                            }
-                        }
-                    }
-                }
-            }
-            
-            return patterns;
-        },
-        
-        getSuggestedTransforms(pattern) {
-            const map = {
-                'repeat': ['shift_text'],
-                'palindrome': ['reverse_segment'],
-                'palindrome_long': ['reverse_segment', 'transpose_columns'],
-                'vc_high': ['shift_text_neg'],
-                'vc_low': ['shift_text_pos'],
-                'cluster': ['shift_text'],
-                'known_bad_context': ['reverse_segment', 'transpose_columns']
-            };
-            return map[pattern.type] || [];
-        }
-    };
-})();
-// === TRANSFORMATION ENGINE — меняет ТЕКСТ, ключ тот же ===
-const TransformEngine = (() => {
-    return {
-        apply(text, transformName, pattern) {
-            switch (transformName) {
-                case 'reverse_segment':
-                    return this.reverseSegment(text, pattern.pos, pattern.pos + (pattern.len || 4));
-                case 'shift_text':
-                case 'shift_text_pos':
-                    return this.shiftText(text, 1);
-                case 'shift_text_neg':
-                    return this.shiftText(text, -1);
-                case 'transpose_columns':
-                    return this.transposeColumns(text, 5);
-                default:
-                    return text;
-            }
-        },
-        
-        reverseSegment(text, start, end) {
-            if (!text || start >= end || start < 0 || end > text.length) return text;
-            const pre = text.slice(0, start);
-            const seg = text.slice(start, end).split('').reverse().join('');
-            const post = text.slice(end);
-            return pre + seg + post;
-        },
-        
-        shiftText(text, shift) {
-            if (!text || ALPHABET.length === 0) return text;
-            const len = ALPHABET.length;
-            return text.split('').map(c => {
-                const idx = ALPHABET_POS_ARRAY[c.charCodeAt(0)];
-                if (idx === 255) return c;
-                const newIdx = ((idx + shift) % len + len) % len;
-                return ALPHABET[newIdx];
-            }).join('');
-        },
-        
-        transposeColumns(text, width) {
-            if (!text || text.length === 0) return text;
-            const rows = Math.ceil(text.length / width);
-            const grid = [];
-            for (let r = 0; r < rows; r++) {
-                grid.push(text.slice(r * width, (r + 1) * width).padEnd(width, ' '));
-            }
-            let result = '';
-            for (let c = 0; c < width; c++) {
-                for (let r = 0; r < rows; r++) {
-                    result += grid[r][c];
-                }            }
-            return result.trim();
-        }
-    };
-})();
-
-function initAlphabetPositions() {
-    ALPHABET_POSITIONS = {};
-    ALPHABET_POS_ARRAY.fill(255);
+// === INIT TABLES (вызывается один раз) ===
+function initTables() {
+    // POS_ARRAY
+    POS_ARRAY.fill(-1);
     for (let i = 0; i < ALPHABET.length; i++) {
-        ALPHABET_POSITIONS[ALPHABET[i]] = i;
-        ALPHABET_POS_ARRAY[ALPHABET.charCodeAt(i)] = i;
+        POS_ARRAY[ALPHABET.charCodeAt(i)] = i;
     }
+    
+    // BIGRAM_SCORES (упрощённая эвристика)
+    const commonBigrams = ['TH','HE','IN','ER','AN','RE','ND','AT','ON','NT','HA','ES','ST','EN','ED'];
+    for (let i = 0; i < 676; i++) {
+        const c1 = String.fromCharCode(65 + Math.floor(i / 26));
+        const c2 = String.fromCharCode(65 + (i % 26));
+        const bg = c1 + c2;
+        BIGRAM_SCORES[i] = commonBigrams.includes(bg) ? 2.0 : 0.1;
+    }
+    
+    // TRIGRAM_SCORES
+    const commonTrigrams = ['THE','AND','ING','HER','HIS','THA','ERE','FOR','ENT','ION'];
+    for (let i = 0; i < 17576; i++) {
+        const c1 = String.fromCharCode(65 + Math.floor(i / 676));
+        const c2 = String.fromCharCode(65 + Math.floor((i % 676) / 26));
+        const c3 = String.fromCharCode(65 + (i % 26));
+        const tg = c1 + c2 + c3;
+        TRIGRAM_SCORES[i] = commonTrigrams.includes(tg) ? 5.0 : 0.2;
+    }
+    
+    // WORD_SCORES
+    const words = ['THE','BE','TO','OF','AND','A','IN','THAT','HAVE','I','IT','FOR','NOT','ON','WITH','HE','AS','YOU','DO','AT'];
+    words.forEach((w, idx) => WORD_SCORES.set(w, 1.0 + w.length * 0.5 + (idx < 10 ? 2.0 : 0)));
+}
+// === FAST DECRYPT (ключевой оптимизированный путь) ===
+function decryptFast(ctCodes, keyCodes, outBuffer) {
+    const len = ctCodes.length;
+    const klen = keyCodes.length;
+    
+    for (let i = 0; i < len; i++) {
+        const cp = ctCodes[i];
+        const kp = keyCodes[i % klen];
+        if (cp < 0 || kp < 0) return -1; // invalid char
+        
+        let pp = cp - kp;
+        if (pp < 0) pp += ALPHABET_SIZE;
+        outBuffer[i] = pp;
+    }
+    return len;
 }
 
-function compileKnownFragments() {
-    KNOWN_FRAGMENTS = [];
-    KNOWN_REGEX = null;
-    if (KNOWN_TEXT && KNOWN_TEXT.trim() !== '') {
-        KNOWN_FRAGMENTS = KNOWN_TEXT.split(',').map(f => f.trim().toUpperCase()).filter(f => f.length > 0);
-        if (KNOWN_FRAGMENTS.length > 0) {
-            const escaped = KNOWN_FRAGMENTS.map(f => f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-            KNOWN_REGEX = new RegExp(`(${escaped.join('|')})`, 'gi');
-        }
-    }
-}
-
-function vigenereDecrypt(ciphertext, key, alphabet, posArray) {
-    if (!ciphertext || !key || key.length === 0) return "";
-    const keyLen = key.length;
-    const alphabetSize = alphabet.length;
-    const plaintext = new Array(ciphertext.length);
-    const keyPositions = new Uint8Array(keyLen);
+// === ULTRA-FAST SCORING (early-exit, integer math) ===
+function scoreFast(plainCodes, len) {
+    if (len < 3) return 0;
     
-    for (let i = 0; i < keyLen; i++) {
-        const pos = posArray[key.charCodeAt(i)];
-        if (pos === 255) return "";
-        keyPositions[i] = pos;
-    }
-    
-    for (let i = 0; i < ciphertext.length; i++) {
-        const cipherPos = posArray[ciphertext.charCodeAt(i)];
-        if (cipherPos === 255) return "";
-        let plainPos = (cipherPos - keyPositions[i % keyLen]);
-        if (plainPos < 0) plainPos += alphabetSize;
-        plaintext[i] = alphabet[plainPos % alphabetSize];
-    }
-    
-    return plaintext.join('');
-}
-function scoreText(text) {
-    if (!text || text.length === 0) return 0;
     let score = 0;
-    const upperText = text.toUpperCase();
-    const textLen = upperText.length;
     
-    if (textLen >= 3) {
-        for (const word in WORD_SCORES) {
-            if (word.length > textLen) continue;
-            let pos = 0;
-            while ((pos = upperText.indexOf(word, pos)) !== -1) {
-                score += WORD_SCORES[word];
-                pos += word.length;
+    // 1. Known fragments (O(1) check per fragment)
+    for (const frag of KNOWN_FRAGMENTS) {
+        if (frag.length > len) continue;
+        const fragCodes = frag.split('').map(c => POS_ARRAY[c.charCodeAt(0)]);
+        if (fragCodes.includes(-1)) continue;
+        
+        // Boyer-Moore-lite search
+        for (let i = 0; i <= len - frag.length; i++) {
+            let match = true;
+            for (let j = 0; j < frag.length; j++) {
+                if (plainCodes[i + j] !== fragCodes[j]) { match = false; break; }
+            }
+            if (match) {
+                score += 10 + frag.length * 2;
+                break; // один раз на фрагмент
             }
         }
     }
     
-    if (KNOWN_REGEX) {
-        const matches = upperText.match(KNOWN_REGEX);
-        if (matches) {
-            for (const m of matches) score += 5 + (m.length * 1.5);
+    // Early exit: если уже хороший скор — возвращаем
+    if (score > SCORE_THRESHOLD * 3) return score;
+    
+    // 2. Bigrams (однопроходный)
+    for (let i = 0; i < len - 1; i++) {
+        const idx = plainCodes[i] * 26 + plainCodes[i + 1];
+        score += BIGRAM_SCORES[idx];    }
+    
+    // Early exit
+    if (score > SCORE_THRESHOLD * 2) return score;
+    
+    // 3. Trigrams (только если текст длинный)
+    if (len >= 3) {
+        for (let i = 0; i < len - 2; i++) {
+            const idx = plainCodes[i] * 676 + plainCodes[i+1] * 26 + plainCodes[i+2];
+            score += TRIGRAM_SCORES[idx];
         }
     }
     
-    if (textLen >= 3) {
-        for (const trigram of COMMON_TRIGRAMS) {
-            let pos = 0;
-            while ((pos = upperText.indexOf(trigram, pos)) !== -1) {
-                score += 0.3;
-                pos += trigram.length;
-            }
-        }
+    // 4. Words (только топ-10 самых частых)
+    const text = String.fromCharCode(...plainCodes.slice(0, Math.min(200, len)));
+    for (const [word, pts] of WORD_SCORES) {
+        if (text.includes(word)) score += pts;
     }
     
-    if (textLen >= 2) {
-        for (const bigram of COMMON_BIGRAMS) {
-            let pos = 0;
-            while ((pos = upperText.indexOf(bigram, pos)) !== -1) {
-                score += 0.1;
-                pos += bigram.length;
-            }
-        }
-    }
-    
-    const charCounts = new Uint16Array(ALPHABET_SIZE);
-    let totalChars = 0;
-    for (let i = 0; i < textLen; i++) {
-        const pos = ALPHABET_POS_ARRAY[upperText.charCodeAt(i)];
-        if (pos !== 255) { charCounts[pos]++; totalChars++; }    }
-    
-    if (totalChars > 0) {
-        for (let i = 0; i < ALPHABET.length; i++) {
-            const char = ALPHABET[i];
-            const expected = (ENGLISH_FREQUENCIES[char] || 0) / 100;
-            const observed = charCounts[i] / totalChars;
-            const diff = Math.abs(expected - observed);
-            score += (1 - diff) * expected * 15;
-        }
-    }
-    
-    if (textLen > 0) score = score * (Math.min(textLen, 100) / 100);
-    return Math.max(0, score);
+    // Normalize
+    return score * Math.min(1, len / 100);
 }
 
-// === ATTACK VARIANTS — 6 способов атаки на каждый ключ ===
-function getAttackVariants(ciphertext, key) {
-    const variants = [];
+// === PATTERN DETECTION (только для топ-кандидатов) ===
+function detectPatterns(plainCodes, len) {
+    const patterns = [];
+    const scanLen = Math.min(64, len);
     
-    // 1. Оригинал
-    variants.push({ 
-        text: ciphertext, 
-        attack: 'original', 
-        key: key, 
-        description: 'Standard Vigenère',
-        customAlphabet: null 
-    });
-    
-    // 2. Реверс ciphertext'а (перед расшифровкой)
-    variants.push({ 
-        text: ciphertext.split('').reverse().join(''), 
-        attack: 'reverse_ct', 
-        key: key, 
-        description: 'Reversed ciphertext',
-        customAlphabet: null 
-    });
-    
-    // 3. Ключ реверснутый
-    variants.push({ 
-        text: ciphertext, 
-        attack: 'key_reverse', 
-        key: key.split('').reverse().join(''), 
-        description: 'Reversed key',
-        customAlphabet: null 
-    });
-    
-    // 4. Сдвиг алфавита +1
-    if (ALPHABET_SIZE === 26) {
-        variants.push({             text: ciphertext, 
-            attack: 'alphabet_shift+1', 
-            key: key, 
-            description: 'Alphabet shifted +1',
-            customAlphabet: ALPHABET.slice(1) + ALPHABET[0]
-        });
+    // Quick palindrome check (4-char)
+    for (let i = 0; i < scanLen - 3; i++) {
+        if (plainCodes[i] === plainCodes[i+3] && plainCodes[i+1] === plainCodes[i+2]) {
+            patterns.push('PAL');
+            break;
+        }
     }
     
-    // 5. Сдвиг алфавита -1
-    if (ALPHABET_SIZE === 26) {
-        variants.push({ 
-            text: ciphertext, 
-            attack: 'alphabet_shift-1', 
-            key: key, 
-            description: 'Alphabet shifted -1',
-            customAlphabet: ALPHABET[ALPHABET.length - 1] + ALPHABET.slice(0, -1)
-        });
+    // Quick repeat check
+    for (let i = 0; i < scanLen - 3; i++) {
+        if (plainCodes[i] === plainCodes[i+3] && plainCodes[i+1] === plainCodes[i+4]) {
+            patterns.push('RPT');
+            break;
+        }
     }
     
-    // 6. Транспозиция колонок (width=5)
-    variants.push({ 
-        text: TransformEngine.transposeColumns(ciphertext, 5), 
-        attack: 'transpose_5', 
-        key: key, 
-        description: 'Columnar transposition (5)',
-        customAlphabet: null 
-    });
-    
-    return variants;
+    return patterns;
 }
 
-function processBatch(ciphertext, keys) {
+// === TEXT TRANSFORMS (применяются к кодам, не к строкам) ===
+function transformReverseSegment(codes, start, end) {
+    const result = codes.slice();    for (let i = start, j = end - 1; i < j; i++, j--) {
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
+
+function transformShiftText(codes, shift) {
+    const result = new Int8Array(codes.length);
+    for (let i = 0; i < codes.length; i++) {
+        let v = codes[i] + shift;
+        if (v < 0) v += ALPHABET_SIZE;
+        result[i] = v % ALPHABET_SIZE;
+    }
+    return result;
+}
+
+// === ATTACK VARIANTS (6 векторов, но без лишних аллокаций) ===
+function* getVariants(ctCodes, key) {
+    // 1. Original
+    yield { ct: ctCodes, key, alphabet: POS_ARRAY, attack: 'original' };
+    
+    // 2. Reverse ciphertext
+    const revCt = ctCodes.slice().reverse();
+    yield { ct: revCt, key, alphabet: POS_ARRAY, attack: 'reverse_ct' };
+    
+    // 3. Reversed key
+    const revKey = key.split('').reverse().join('');
+    yield { ct: ctCodes, key: revKey, alphabet: POS_ARRAY, attack: 'key_reverse' };
+    
+    // 4-5. Alphabet shifts (только если стандартный алфавит)
+    if (ALPHABET_SIZE === 26) {
+        const shiftPos = new Int8Array(256);
+        shiftPos.fill(-1);
+        const shifted = ALPHABET.slice(1) + ALPHABET[0];
+        for (let i = 0; i < 26; i++) shiftPos[shifted.charCodeAt(i)] = i;
+        yield { ct: ctCodes, key, alphabet: shiftPos, attack: 'alphabet_shift+1' };
+        
+        const shiftNeg = new Int8Array(256);
+        shiftNeg.fill(-1);
+        const shifted2 = ALPHABET[25] + ALPHABET.slice(0, 25);
+        for (let i = 0; i < 26; i++) shiftNeg[shifted2.charCodeAt(i)] = i;
+        yield { ct: ctCodes, key, alphabet: shiftNeg, attack: 'alphabet_shift-1' };
+    }
+    
+    // 6. Transpose columns (width=5)
+    const transposed = transposeCodes(ctCodes, 5);
+    yield { ct: transposed, key, alphabet: POS_ARRAY, attack: 'transpose_5' };
+}
+
+function transposeCodes(codes, width) {    const len = codes.length;
+    const rows = Math.ceil(len / width);
+    const result = new Int8Array(len);
+    let idx = 0;
+    for (let c = 0; c < width; c++) {
+        for (let r = 0; r < rows; r++) {
+            const pos = r * width + c;
+            if (pos < len) result[idx++] = codes[pos];
+        }
+    }
+    return result;
+}
+
+// === MAIN PROCESS (оптимизированный цикл) ===
+function processBatch(ctCodes, keys) {
     const results = [];
     const startTime = performance.now();
     const threshold = SCORE_THRESHOLD * 0.5;
-    const MAX_TRANSFORMS = 2;
+    const outBuffer = new Int8Array(ctCodes.length);
     
-    // Тест конкретных ключей со всеми вариантами атаки
-    if (TEST_SPECIFIC_KEYS.length > 0 && keys.length === 0) {
-        for (const testKey of TEST_SPECIFIC_KEYS) {
-            const variants = getAttackVariants(ciphertext, testKey);
-            
-            for (const variant of variants) {
-                let decryptAlphabet = ALPHABET;
-                let decryptPosArray = ALPHABET_POS_ARRAY;
-                
-                if (variant.customAlphabet) {
-                    decryptAlphabet = variant.customAlphabet;
-                    decryptPosArray = new Uint8Array(256);
-                    decryptPosArray.fill(255);                    for (let i = 0; i < decryptAlphabet.length; i++) {
-                        decryptPosArray[decryptAlphabet.charCodeAt(i)] = i;
-                    }
-                }
-                
-                const plaintext = vigenereDecrypt(variant.text, variant.key, decryptAlphabet, decryptPosArray);
-                if (!plaintext) continue;
-                
-                let baseScore = scoreText(plaintext);
-                let bestText = plaintext;
-                let bestScore = baseScore;
-                let transforms = [];
-                let patterns = [];
-                
-                // Адаптивные трансформации ТЕКСТА
-                const detectedPatterns = PatternEngine.detect(plaintext);
-                if (detectedPatterns.length > 0) {
-                    let currentText = plaintext;
-                    let currentScore = baseScore;
-                    
-                    for (const pattern of detectedPatterns) {
-                        if (transforms.length >= MAX_TRANSFORMS) break;
-                        
-                        const suggested = PatternEngine.getSuggestedTransforms(pattern);
-                        for (const tName of suggested) {
-                            const newText = TransformEngine.apply(currentText, tName, pattern);
-                            if (!newText || newText === currentText) continue;
-                            
-                            const newScore = scoreText(newText);
-                            if (newScore > currentScore + 0.5) {
-                                currentText = newText;
-                                currentScore = newScore;
-                                transforms.push(tName + '[' + pattern.type + ']');
-                                patterns.push(pattern.type);
-                                
-                                if (currentScore > bestScore) {
-                                    bestText = currentText;
-                                    bestScore = currentScore;
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                if (bestScore > threshold) {
-                    results.push({
-                        key: testKey,
-                        plaintext: bestText,
-                        score: parseFloat(bestScore.toFixed(2)),
-                        baseScore: parseFloat(baseScore.toFixed(2)),                        transforms: transforms,
-                        patterns: patterns,
-                        attack: variant.attack,
-                        attackDescription: variant.description,
-                        isSpecificKey: true
-                    });
-                }
-            }
-        }
-    }
-    
-    // Обычный брутфорс со всеми вариантами атаки
     for (const key of keys) {
-        try {
-            const variants = getAttackVariants(ciphertext, key);
+        const keyCodes = key.split('').map(c => POS_ARRAY[c.charCodeAt(0)]);
+        if (keyCodes.includes(-1)) continue;
+        
+        for (const variant of getVariants(ctCodes, key)) {
+            const plainLen = decryptFast(variant.ct, keyCodes, outBuffer);
+            if (plainLen < 1) continue;
             
-            for (const variant of variants) {
-                let decryptAlphabet = ALPHABET;
-                let decryptPosArray = ALPHABET_POS_ARRAY;
+            // Быстрый скор
+            let score = scoreFast(outBuffer, plainLen);
+            if (score < threshold) continue;
+            
+            // Только для хороших кандидатов: паттерны + трансформации
+            let bestCodes = outBuffer.slice();
+            let bestScore = score;
+            let transforms = [];
+            
+            const patterns = detectPatterns(bestCodes, plainLen);
+            if (patterns.length > 0 && score < threshold * 3) {
+                let current = bestCodes;
+                let currentScore = score;
                 
-                if (variant.customAlphabet) {
-                    decryptAlphabet = variant.customAlphabet;
-                    decryptPosArray = new Uint8Array(256);
-                    decryptPosArray.fill(255);
-                    for (let i = 0; i < decryptAlphabet.length; i++) {
-                        decryptPosArray[decryptAlphabet.charCodeAt(i)] = i;
-                    }
-                }
-                
-                const plaintext = vigenereDecrypt(variant.text, variant.key, decryptAlphabet, decryptPosArray);
-                if (!plaintext) continue;
-                
-                let baseScore = scoreText(plaintext);
-                let bestText = plaintext;
-                let bestScore = baseScore;
-                let transforms = [];
-                let patterns = [];
-                
-                const detectedPatterns = PatternEngine.detect(plaintext);
-                if (detectedPatterns.length > 0) {
-                    let currentText = plaintext;
-                    let currentScore = baseScore;
+                for (const p of patterns) {
+                    if (transforms.length >= 2) break;
                     
-                    for (const pattern of detectedPatterns) {
-                        if (transforms.length >= MAX_TRANSFORMS) break;
-                        
-                        const suggested = PatternEngine.getSuggestedTransforms(pattern);
-                        for (const tName of suggested) {
-                            const newText = TransformEngine.apply(currentText, tName, pattern);
-                            if (!newText || newText === currentText) continue;                            
-                            const newScore = scoreText(newText);
-                            if (newScore > currentScore + 0.5) {
-                                currentText = newText;
-                                currentScore = newScore;
-                                transforms.push(tName + '[' + pattern.type + ']');
-                                patterns.push(pattern.type);
-                                
-                                if (currentScore > bestScore) {
-                                    bestText = currentText;
-                                    bestScore = currentScore;
+                    if (p === 'PAL') {
+                        // Найти позицию палиндрома
+                        for (let i = 0; i < Math.min(64, plainLen) - 3; i++) {
+                            if (current[i] === current[i+3] && current[i+1] === current[i+2]) {
+                                const transformed = transformReverseSegment(current, i, i + 4);                                const newScore = scoreFast(transformed, plainLen);
+                                if (newScore > currentScore + 1.0) {
+                                    current = transformed;
+                                    currentScore = newScore;
+                                    transforms.push('REV[PAL]');
+                                    if (currentScore > bestScore) {
+                                        bestCodes = current;
+                                        bestScore = currentScore;
+                                    }
                                 }
+                                break;
+                            }
+                        }
+                    } else if (p === 'RPT') {
+                        const shifted = transformShiftText(current, 1);
+                        const newScore = scoreFast(shifted, plainLen);
+                        if (newScore > currentScore + 1.0) {
+                            current = shifted;
+                            currentScore = newScore;
+                            transforms.push('SHIFT[RPT]');
+                            if (currentScore > bestScore) {
+                                bestCodes = current;
+                                bestScore = currentScore;
                             }
                         }
                     }
                 }
-                
-                if (bestScore > threshold) {
-                    results.push({
-                        key: variant.key,
-                        plaintext: bestText,
-                        score: parseFloat(bestScore.toFixed(2)),
-                        baseScore: parseFloat(baseScore.toFixed(2)),
-                        transforms: transforms,
-                        patterns: patterns,
-                        attack: variant.attack,
-                        attackDescription: variant.description,
-                        isSpecificKey: false
-                    });
-                }
             }
-        } catch (e) {
-            console.error('Error processing key:', key, e);
-            continue;
+            
+            if (bestScore > threshold) {
+                // Конвертируем коды в строку только для результатов
+                const plaintext = String.fromCharCode(...bestCodes.map(c => ALPHABET.charCodeAt(c)));
+                results.push({
+                    key: variant.key,
+                    plaintext,
+                    score: parseFloat(bestScore.toFixed(2)),
+                    baseScore: parseFloat(score.toFixed(2)),
+                    transforms,
+                    patterns,
+                    attack: variant.attack,
+                    attackDescription: variant.attack,
+                    isSpecificKey: TEST_KEYS.length > 0 && keys.length === 0
+                });
+            }
         }
     }
     
-    const batchTime = performance.now() - startTime;
+    const elapsed = performance.now() - startTime;
     return {
-        keysTested: keys.length,
-        results: results,
-        currentSpeed: batchTime > 0 ? Math.round((keys.length / batchTime) * 1000) : 0
+        keysTested: keys.length,        results,
+        currentSpeed: elapsed > 0 ? Math.round((keys.length / elapsed) * 1000) : 0
     };
 }
 
+// === MESSAGE HANDLER ===
 onmessage = function(e) {
     if (e.data.type === 'init') {
         ALPHABET = e.data.alphabet || "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         ALPHABET_SIZE = ALPHABET.length;
-        CIPHERTEXT = e.data.ciphertext || "";        CIPHERTEXT_LENGTH = e.data.ciphertextLength || 0;
-        KNOWN_TEXT = e.data.knownText || "";
+        CIPHERTEXT = e.data.ciphertext || "";
+        KNOWN_FRAGMENTS = (e.data.knownText || "").split(',').map(f => f.trim().toUpperCase()).filter(f => f);
         BATCH_SIZE = e.data.batchSize || 100000;
         SCORE_THRESHOLD = e.data.scoreThreshold || 1.0;
         WORKER_ID = e.data.workerId || 0;
-        TEST_SPECIFIC_KEYS = e.data.testSpecificKeys || [];
+        TEST_KEYS = e.data.testSpecificKeys || [];
         
-        initAlphabetPositions();
-        compileKnownFragments();
+        // Precompute
+        initTables();
+        CT_CODES = new Int8Array(CIPHERTEXT.length);
+        for (let i = 0; i < CIPHERTEXT.length; i++) {
+            CT_CODES[i] = POS_ARRAY[CIPHERTEXT.charCodeAt(i)];
+        }
         return;
     }
 
     if (e.data.type === 'process') {
-        const result = processBatch(e.data.ciphertext, e.data.keys);
+        const ct = e.data.ciphertext ? 
+            new Int8Array(e.data.ciphertext.length).map((_, i) => POS_ARRAY[e.data.ciphertext.charCodeAt(i)]) : 
+            CT_CODES;
+        const result = processBatch(ct, e.data.keys);
         postMessage({
             keysTested: result.keysTested,
             results: result.results,
