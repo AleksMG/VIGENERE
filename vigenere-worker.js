@@ -9,11 +9,9 @@ let BATCH_SIZE = 100000;
 let SCORE_THRESHOLD = 1.0;
 let WORKER_ID = 0;
 
-// === OPTIMIZATION: Precompiled known fragments ===
 let KNOWN_FRAGMENTS = [];
 let KNOWN_REGEX = null;
 
-// Frequency data
 const ENGLISH_FREQUENCIES = {
     'A': 8.167, 'B': 1.492, 'C': 2.782, 'D': 4.253,
     'E': 12.702, 'F': 2.228, 'G': 2.015, 'H': 6.094,
@@ -48,13 +46,11 @@ const COMMON_TRIGRAMS = [
     'THE', 'AND', 'ING', 'HER', 'HAT', 'HIS', 'THA', 'ERE', 'FOR', 'ENT',
     'ION', 'TER', 'WAS', 'YOU', 'ITH', 'VER', 'ALL', 'WIT', 'THI', 'TIO'
 ];
-// Precompute word scores
-const WORD_SCORES = {};
-COMMON_WORDS.forEach((word, index) => {
+
+const WORD_SCORES = {};COMMON_WORDS.forEach((word, index) => {
     WORD_SCORES[word] = 0.5 + (word.length * 0.3) + (index < 20 ? 0.5 : 0);
 });
 
-// === ADAPTIVE PATTERN ENGINE ===
 const PatternEngine = (() => {
     const SCAN_LIMIT = 64;
     const vowels = new Set('AEIOU');
@@ -67,7 +63,6 @@ const PatternEngine = (() => {
             const scanText = text.slice(0, SCAN_LIMIT);
             const len = scanText.length;
             
-            // 1. Повторяющиеся последовательности
             for (let i = 0; i < len - 3; i++) {
                 if (scanText[i] === scanText[i+3] && scanText[i+1] === scanText[i+4]) {
                     patterns.push({ type: 'repeat', seq: scanText.slice(i, i+3), pos: i });
@@ -75,7 +70,6 @@ const PatternEngine = (() => {
                 }
             }
             
-            // 2. Палиндромы (4 символа)
             for (let i = 0; i < len - 3; i++) {
                 if (scanText[i] === scanText[i+3] && scanText[i+1] === scanText[i+2]) {
                     patterns.push({ type: 'palindrome', seq: scanText.slice(i, i+4), pos: i, len: 4 });
@@ -83,7 +77,6 @@ const PatternEngine = (() => {
                 }
             }
             
-            // 3. Длинные палиндромы (5+)
             for (let i = 0; i < len - 4; i++) {
                 const sub = scanText.slice(i, i+5);
                 if (sub === sub.split('').reverse().join('')) {
@@ -92,21 +85,19 @@ const PatternEngine = (() => {
                 }
             }
             
-            // 4. Аномалия гласных/согласных
             let vCount = 0;
             for (let i = 0; i < SCAN_LIMIT && i < text.length; i++) {
                 if (vowels.has(text[i])) vCount++;
-            }            const total = Math.min(SCAN_LIMIT, text.length);
+            }
+            const total = Math.min(SCAN_LIMIT, text.length);
             if (total > 0) {
                 const vRatio = vCount / total;
                 if (vRatio > 0.55) {
                     patterns.push({ type: 'vc_high', ratio: vRatio });
                 } else if (vRatio < 0.25) {
                     patterns.push({ type: 'vc_low', ratio: vRatio });
-                }
-            }
+                }            }
             
-            // 5. Кластеры одинаковых букв
             for (let i = 2; i < len; i++) {
                 if (scanText[i] === scanText[i-1] && scanText[i] === scanText[i-2]) {
                     patterns.push({ type: 'cluster', char: scanText[i], pos: i });
@@ -114,7 +105,6 @@ const PatternEngine = (() => {
                 }
             }
             
-            // 6. Known-fragment с плохим окружением
             if (KNOWN_REGEX && KNOWN_FRAGMENTS.length > 0) {
                 for (const frag of KNOWN_FRAGMENTS) {
                     const idx = text.toUpperCase().indexOf(frag);
@@ -145,43 +135,34 @@ const PatternEngine = (() => {
                 'palindrome_long': ['reverse_segment', 'transpose_columns'],
                 'vc_high': ['shift_alphabet_neg'],
                 'vc_low': ['shift_alphabet_pos'],
-                'cluster': ['deshift_alphabet'],                'known_bad_context': ['partial_reverse']
+                'cluster': ['deshift_alphabet'],
+                'known_bad_context': ['partial_reverse']
             };
             return map[pattern.type] || [];
         }
     };
 })();
 
-// === TRANSFORMATION ENGINE ===
 const TransformEngine = (() => {
     return {
-        apply(text, key, alphabet, transformName, pattern) {
-            switch (transformName) {
+        apply(text, key, alphabet, transformName, pattern) {            switch (transformName) {
                 case 'reverse_segment':
                     return { text: this.reverseSegment(text, pattern.pos, pattern.pos + (pattern.len || 4)), key };
-                
                 case 'shift_alphabet':
                 case 'shift_alphabet_pos':
                     return { text: this.shiftAlphabet(text, alphabet, 1), key };
-                
                 case 'shift_alphabet_neg':
                     return { text: this.shiftAlphabet(text, alphabet, -1), key };
-                
                 case 'deshift_alphabet':
                     return { text: this.shiftAlphabet(text, alphabet, pattern.char ? alphabet.indexOf(pattern.char) : 1), key };
-                
                 case 'partial_reverse':
                     return { text: this.reverseSegment(text, Math.max(0, pattern.pos - 5), pattern.pos + (pattern.frag?.length || 0) + 5), key };
-                
                 case 'transpose_columns':
                     return { text: this.transposeColumns(text, 5), key };
-                
                 case 'key_mutation_shift':
                     return { text, key: key.slice(1) + key[0] };
-                
                 case 'key_mutation_reverse':
                     return { text, key: key.split('').reverse().join('') };
-                
                 default:
                     return { text, key };
             }
@@ -194,7 +175,8 @@ const TransformEngine = (() => {
             const post = text.slice(end);
             return pre + seg + post;
         },
-                shiftAlphabet(text, alphabet, shift) {
+        
+        shiftAlphabet(text, alphabet, shift) {
             if (!text || !alphabet || alphabet.length === 0) return text;
             const len = alphabet.length;
             return text.split('').map(c => {
@@ -212,8 +194,7 @@ const TransformEngine = (() => {
             for (let r = 0; r < rows; r++) {
                 grid.push(text.slice(r * width, (r + 1) * width).padEnd(width, ' '));
             }
-            let result = '';
-            for (let c = 0; c < width; c++) {
+            let result = '';            for (let c = 0; c < width; c++) {
                 for (let r = 0; r < rows; r++) {
                     result += grid[r][c];
                 }
@@ -223,7 +204,6 @@ const TransformEngine = (() => {
     };
 })();
 
-// Initialize alphabet positions
 function initAlphabetPositions() {
     ALPHABET_POSITIONS = {};
     ALPHABET_POS_ARRAY.fill(255);
@@ -233,7 +213,6 @@ function initAlphabetPositions() {
     }
 }
 
-// Precompile known fragments
 function compileKnownFragments() {
     KNOWN_FRAGMENTS = [];
     KNOWN_REGEX = null;
@@ -243,44 +222,34 @@ function compileKnownFragments() {
             const escaped = KNOWN_FRAGMENTS.map(f => f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
             KNOWN_REGEX = new RegExp(`(${escaped.join('|')})`, 'gi');
         }
-    }}
+    }
+}
 
-// Optimized Vigenère decryption
 function vigenereDecrypt(ciphertext, key) {
     if (!ciphertext || !key || key.length === 0) return "";
-    
     const keyLen = key.length;
     const plaintext = new Array(ciphertext.length);
     const keyPositions = new Uint8Array(keyLen);
-    
     for (let i = 0; i < keyLen; i++) {
         const pos = ALPHABET_POS_ARRAY[key.charCodeAt(i)];
         if (pos === 255) return "";
         keyPositions[i] = pos;
     }
-    
     for (let i = 0; i < ciphertext.length; i++) {
         const cipherPos = ALPHABET_POS_ARRAY[ciphertext.charCodeAt(i)];
         if (cipherPos === 255) return "";
-        
         let plainPos = (cipherPos - keyPositions[i % keyLen]) % ALPHABET_SIZE;
         if (plainPos < 0) plainPos += ALPHABET_SIZE;
-        
         plaintext[i] = ALPHABET[plainPos];
     }
-    
     return plaintext.join('');
 }
-
-// Scoring algorithm
 function scoreText(text) {
     if (!text || text.length === 0) return 0;
-    
     let score = 0;
     const upperText = text.toUpperCase();
     const textLen = upperText.length;
     
-    // Common words
     if (textLen >= 3) {
         for (const word in WORD_SCORES) {
             if (word.length > textLen) continue;
@@ -292,7 +261,7 @@ function scoreText(text) {
         }
     }
     
-    // Known fragments    if (KNOWN_REGEX) {
+    if (KNOWN_REGEX) {
         const matches = upperText.match(KNOWN_REGEX);
         if (matches) {
             for (const m of matches) {
@@ -301,7 +270,6 @@ function scoreText(text) {
         }
     }
     
-    // Trigrams
     if (textLen >= 3) {
         for (const trigram of COMMON_TRIGRAMS) {
             let pos = 0;
@@ -312,7 +280,6 @@ function scoreText(text) {
         }
     }
     
-    // Bigrams
     if (textLen >= 2) {
         for (const bigram of COMMON_BIGRAMS) {
             let pos = 0;
@@ -323,12 +290,9 @@ function scoreText(text) {
         }
     }
     
-    // Frequency analysis
     const charCounts = new Uint16Array(26);
     let totalChars = 0;
-    
-    for (let i = 0; i < textLen; i++) {
-        const pos = ALPHABET_POS_ARRAY[upperText.charCodeAt(i)];
+    for (let i = 0; i < textLen; i++) {        const pos = ALPHABET_POS_ARRAY[upperText.charCodeAt(i)];
         if (pos !== 255) {
             charCounts[pos]++;
             totalChars++;
@@ -341,14 +305,14 @@ function scoreText(text) {
             const char = freqKeys[i];
             const pos = ALPHABET_POSITIONS[char];
             if (pos !== undefined) {
-                const expected = ENGLISH_FREQUENCIES[char] / 100;                const observed = charCounts[pos] / totalChars;
+                const expected = ENGLISH_FREQUENCIES[char] / 100;
+                const observed = charCounts[pos] / totalChars;
                 const diff = Math.abs(expected - observed);
                 score += (1 - diff) * expected * 15;
             }
         }
     }
     
-    // Normalize
     if (textLen > 0) {
         score = score * (Math.min(textLen, 100) / 100);
     }
@@ -356,7 +320,6 @@ function scoreText(text) {
     return Math.max(0, score);
 }
 
-// === ADAPTIVE PROCESS BATCH ===
 function processBatch(ciphertext, keys) {
     const results = [];
     const startTime = performance.now();
@@ -365,11 +328,9 @@ function processBatch(ciphertext, keys) {
     
     for (const key of keys) {
         try {
-            // 1. Базовый decrypt
             const plaintext = vigenereDecrypt(ciphertext, key);
             if (!plaintext) continue;
             
-            // 2. Базовый скор
             let baseScore = scoreText(plaintext);
             let bestResult = {
                 plaintext,
@@ -379,18 +340,16 @@ function processBatch(ciphertext, keys) {
                 patterns: []
             };
             
-            // 3. Детекция паттернов
             const patterns = PatternEngine.detect(plaintext);
-            
-            // 4. Адаптивные трансформации
-            if (patterns.length > 0) {
+                        if (patterns.length > 0) {
                 let currentText = plaintext;
                 let currentKey = key;
                 let currentScore = baseScore;
                 let appliedTransforms = [];
                 let detectedPatterns = [];
                 
-                for (const pattern of patterns) {                    if (appliedTransforms.length >= MAX_TRANSFORMS_PER_KEY) break;
+                for (const pattern of patterns) {
+                    if (appliedTransforms.length >= MAX_TRANSFORMS_PER_KEY) break;
                     
                     const suggested = PatternEngine.getSuggestedTransforms(pattern);
                     
@@ -408,7 +367,7 @@ function processBatch(ciphertext, keys) {
                             currentText = transformedText;
                             currentKey = transformedKey;
                             currentScore = newScore;
-                            appliedTransforms.push(`${transformName.split('_').pop()}[${pattern.type}]`);
+                            appliedTransforms.push(transformName.split('_').pop() + '[' + pattern.type + ']');
                             detectedPatterns.push(pattern.type);
                             
                             if (currentScore > bestResult.score) {
@@ -416,9 +375,9 @@ function processBatch(ciphertext, keys) {
                                     plaintext: currentText,
                                     key: currentKey,
                                     score: currentScore,
-                                    transforms: [...appliedTransforms],
-                                    patterns: [...detectedPatterns],
-                                    baseScore
+                                    transforms: appliedTransforms.slice(),
+                                    patterns: detectedPatterns.slice(),
+                                    baseScore: baseScore
                                 };
                             }
                         }
@@ -426,20 +385,19 @@ function processBatch(ciphertext, keys) {
                 }
             }
             
-            // 5. Push если порог пройден
             if (bestResult.score > threshold) {
                 results.push({
                     key: bestResult.key,
                     plaintext: bestResult.plaintext,
                     score: parseFloat(bestResult.score.toFixed(2)),
-                    baseScore: parseFloat((bestResult.baseScore || bestResult.score).toFixed(2)),
-                    transforms: bestResult.transforms,
+                    baseScore: parseFloat((bestResult.baseScore || bestResult.score).toFixed(2)),                    transforms: bestResult.transforms,
                     patterns: bestResult.patterns
                 });
             }
         } catch (e) {
             console.error('Error processing key:', key, e);
-            continue;        }
+            continue;
+        }
     }
     
     const batchTime = performance.now() - startTime;
@@ -447,12 +405,11 @@ function processBatch(ciphertext, keys) {
     
     return {
         keysTested: keys.length,
-        results,
-        currentSpeed
+        results: results,
+        currentSpeed: currentSpeed
     };
 }
 
-// Main message handler
 onmessage = function(e) {
     if (e.data.type === 'init') {
         ALPHABET = e.data.alphabet || "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -471,7 +428,9 @@ onmessage = function(e) {
     if (e.data.type === 'process') {
         const result = processBatch(e.data.ciphertext, e.data.keys);
         postMessage({
-            ...result,
+            keysTested: result.keysTested,
+            results: result.results,
+            currentSpeed: result.currentSpeed,
             workerId: WORKER_ID
         });
     }
