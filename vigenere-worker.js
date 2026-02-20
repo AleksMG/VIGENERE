@@ -3,11 +3,13 @@ let ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 let ALPHABET_SIZE = 26;
 let ALPHABET_POSITIONS = {};
 let ALPHABET_POS_ARRAY = new Uint8Array(256);
+let CIPHERTEXT = "";
 let CIPHERTEXT_LENGTH = 0;
 let KNOWN_TEXT = "";
 let BATCH_SIZE = 100000;
 let SCORE_THRESHOLD = 1.0;
 let WORKER_ID = 0;
+let TEST_SPECIFIC_KEYS = [];
 
 let KNOWN_FRAGMENTS = [];
 let KNOWN_REGEX = null;
@@ -46,11 +48,12 @@ const COMMON_TRIGRAMS = [
     'THE', 'AND', 'ING', 'HER', 'HAT', 'HIS', 'THA', 'ERE', 'FOR', 'ENT',
     'ION', 'TER', 'WAS', 'YOU', 'ITH', 'VER', 'ALL', 'WIT', 'THI', 'TIO'
 ];
-
-const WORD_SCORES = {};COMMON_WORDS.forEach((word, index) => {
+const WORD_SCORES = {};
+COMMON_WORDS.forEach((word, index) => {
     WORD_SCORES[word] = 0.5 + (word.length * 0.3) + (index < 20 ? 0.5 : 0);
 });
 
+// === PATTERN ENGINE (Detects structural anomalies) ===
 const PatternEngine = (() => {
     const SCAN_LIMIT = 64;
     const vowels = new Set('AEIOU');
@@ -63,6 +66,7 @@ const PatternEngine = (() => {
             const scanText = text.slice(0, SCAN_LIMIT);
             const len = scanText.length;
             
+            // 1. Repeating sequences (indicates simple key)
             for (let i = 0; i < len - 3; i++) {
                 if (scanText[i] === scanText[i+3] && scanText[i+1] === scanText[i+4]) {
                     patterns.push({ type: 'repeat', seq: scanText.slice(i, i+3), pos: i });
@@ -70,6 +74,7 @@ const PatternEngine = (() => {
                 }
             }
             
+            // 2. Palindromes (4 chars)
             for (let i = 0; i < len - 3; i++) {
                 if (scanText[i] === scanText[i+3] && scanText[i+1] === scanText[i+2]) {
                     patterns.push({ type: 'palindrome', seq: scanText.slice(i, i+4), pos: i, len: 4 });
@@ -77,6 +82,7 @@ const PatternEngine = (() => {
                 }
             }
             
+            // 3. Long palindromes (5+ chars)
             for (let i = 0; i < len - 4; i++) {
                 const sub = scanText.slice(i, i+5);
                 if (sub === sub.split('').reverse().join('')) {
@@ -85,19 +91,21 @@ const PatternEngine = (() => {
                 }
             }
             
+            // 4. Vowel/Consonant anomaly
             let vCount = 0;
             for (let i = 0; i < SCAN_LIMIT && i < text.length; i++) {
                 if (vowels.has(text[i])) vCount++;
             }
-            const total = Math.min(SCAN_LIMIT, text.length);
-            if (total > 0) {
+            const total = Math.min(SCAN_LIMIT, text.length);            if (total > 0) {
                 const vRatio = vCount / total;
                 if (vRatio > 0.55) {
                     patterns.push({ type: 'vc_high', ratio: vRatio });
                 } else if (vRatio < 0.25) {
                     patterns.push({ type: 'vc_low', ratio: vRatio });
-                }            }
+                }
+            }
             
+            // 5. Letter clusters
             for (let i = 2; i < len; i++) {
                 if (scanText[i] === scanText[i-1] && scanText[i] === scanText[i-2]) {
                     patterns.push({ type: 'cluster', char: scanText[i], pos: i });
@@ -105,6 +113,7 @@ const PatternEngine = (() => {
                 }
             }
             
+            // 6. Known fragment with bad context
             if (KNOWN_REGEX && KNOWN_FRAGMENTS.length > 0) {
                 for (const frag of KNOWN_FRAGMENTS) {
                     const idx = text.toUpperCase().indexOf(frag);
@@ -136,16 +145,17 @@ const PatternEngine = (() => {
                 'vc_high': ['shift_alphabet_neg'],
                 'vc_low': ['shift_alphabet_pos'],
                 'cluster': ['deshift_alphabet'],
-                'known_bad_context': ['partial_reverse']
-            };
+                'known_bad_context': ['partial_reverse']            };
             return map[pattern.type] || [];
         }
     };
 })();
 
+// === TRANSFORMATION ENGINE (Applies real transformations) ===
 const TransformEngine = (() => {
     return {
-        apply(text, key, alphabet, transformName, pattern) {            switch (transformName) {
+        apply(text, key, alphabet, transformName, pattern) {
+            switch (transformName) {
                 case 'reverse_segment':
                     return { text: this.reverseSegment(text, pattern.pos, pattern.pos + (pattern.len || 4)), key };
                 case 'shift_alphabet':
@@ -184,8 +194,7 @@ const TransformEngine = (() => {
                 if (idx < 0) return c;
                 const newIdx = ((idx + shift) % len + len) % len;
                 return alphabet[newIdx];
-            }).join('');
-        },
+            }).join('');        },
         
         transposeColumns(text, width) {
             if (!text || text.length === 0) return text;
@@ -194,7 +203,8 @@ const TransformEngine = (() => {
             for (let r = 0; r < rows; r++) {
                 grid.push(text.slice(r * width, (r + 1) * width).padEnd(width, ' '));
             }
-            let result = '';            for (let c = 0; c < width; c++) {
+            let result = '';
+            for (let c = 0; c < width; c++) {
                 for (let r = 0; r < rows; r++) {
                     result += grid[r][c];
                 }
@@ -225,25 +235,29 @@ function compileKnownFragments() {
     }
 }
 
-function vigenereDecrypt(ciphertext, key) {
+function vigenereDecrypt(ciphertext, key, alphabet, posArray) {
     if (!ciphertext || !key || key.length === 0) return "";
     const keyLen = key.length;
+    const alphabetSize = alphabet.length;
     const plaintext = new Array(ciphertext.length);
     const keyPositions = new Uint8Array(keyLen);
+    
     for (let i = 0; i < keyLen; i++) {
-        const pos = ALPHABET_POS_ARRAY[key.charCodeAt(i)];
-        if (pos === 255) return "";
+        const pos = posArray[key.charCodeAt(i)];        if (pos === 255) return "";
         keyPositions[i] = pos;
     }
+    
     for (let i = 0; i < ciphertext.length; i++) {
-        const cipherPos = ALPHABET_POS_ARRAY[ciphertext.charCodeAt(i)];
+        const cipherPos = posArray[ciphertext.charCodeAt(i)];
         if (cipherPos === 255) return "";
-        let plainPos = (cipherPos - keyPositions[i % keyLen]) % ALPHABET_SIZE;
-        if (plainPos < 0) plainPos += ALPHABET_SIZE;
-        plaintext[i] = ALPHABET[plainPos];
+        let plainPos = (cipherPos - keyPositions[i % keyLen]);
+        if (plainPos < 0) plainPos += alphabetSize;
+        plaintext[i] = alphabet[plainPos % alphabetSize];
     }
+    
     return plaintext.join('');
 }
+
 function scoreText(text) {
     if (!text || text.length === 0) return 0;
     let score = 0;
@@ -264,9 +278,7 @@ function scoreText(text) {
     if (KNOWN_REGEX) {
         const matches = upperText.match(KNOWN_REGEX);
         if (matches) {
-            for (const m of matches) {
-                score += 5 + (m.length * 1.5);
-            }
+            for (const m of matches) score += 5 + (m.length * 1.5);
         }
     }
     
@@ -280,8 +292,7 @@ function scoreText(text) {
         }
     }
     
-    if (textLen >= 2) {
-        for (const bigram of COMMON_BIGRAMS) {
+    if (textLen >= 2) {        for (const bigram of COMMON_BIGRAMS) {
             let pos = 0;
             while ((pos = upperText.indexOf(bigram, pos)) !== -1) {
                 score += 0.1;
@@ -290,34 +301,38 @@ function scoreText(text) {
         }
     }
     
-    const charCounts = new Uint16Array(26);
+    const charCounts = new Uint16Array(ALPHABET_SIZE);
     let totalChars = 0;
-    for (let i = 0; i < textLen; i++) {        const pos = ALPHABET_POS_ARRAY[upperText.charCodeAt(i)];
-        if (pos !== 255) {
-            charCounts[pos]++;
-            totalChars++;
-        }
+    for (let i = 0; i < textLen; i++) {
+        const pos = ALPHABET_POS_ARRAY[upperText.charCodeAt(i)];
+        if (pos !== 255) { charCounts[pos]++; totalChars++; }
     }
     
     if (totalChars > 0) {
-        const freqKeys = Object.keys(ENGLISH_FREQUENCIES);
-        for (let i = 0; i < freqKeys.length; i++) {
-            const char = freqKeys[i];
-            const pos = ALPHABET_POSITIONS[char];
-            if (pos !== undefined) {
-                const expected = ENGLISH_FREQUENCIES[char] / 100;
-                const observed = charCounts[pos] / totalChars;
-                const diff = Math.abs(expected - observed);
-                score += (1 - diff) * expected * 15;
-            }
+        for (let i = 0; i < ALPHABET.length; i++) {
+            const char = ALPHABET[i];
+            const expected = (ENGLISH_FREQUENCIES[char] || 0) / 100;
+            const observed = charCounts[i] / totalChars;
+            const diff = Math.abs(expected - observed);
+            score += (1 - diff) * expected * 15;
         }
     }
     
-    if (textLen > 0) {
-        score = score * (Math.min(textLen, 100) / 100);
-    }
-    
+    if (textLen > 0) score = score * (Math.min(textLen, 100) / 100);
     return Math.max(0, score);
+}
+
+function getAttackVariants(ciphertext, key) {
+    const variants = [];
+    variants.push({ text: ciphertext, attack: 'original', key, description: 'Standard Vigenère' });
+    variants.push({ text: ciphertext.split('').reverse().join(''), attack: 'reverse_ct', key, description: 'Reversed ciphertext' });
+    variants.push({ text: ciphertext, attack: 'key_reverse', key: key.split('').reverse().join(''), description: 'Reversed key' });
+    if (ALPHABET_SIZE === 26) {
+        variants.push({ text: ciphertext, attack: 'alphabet_shift+1', key, customAlphabet: ALPHABET.slice(1) + ALPHABET[0], description: 'Alphabet shifted +1' });
+        variants.push({ text: ciphertext, attack: 'alphabet_shift-1', key, customAlphabet: ALPHABET[ALPHABET.length - 1] + ALPHABET.slice(0, -1), description: 'Alphabet shifted -1' });
+    }
+    variants.push({ text: TransformEngine.transposeColumns(ciphertext, 5), attack: 'transpose_5', key, description: 'Columnar transposition (5)' });
+    return variants;
 }
 
 function processBatch(ciphertext, keys) {
@@ -326,22 +341,88 @@ function processBatch(ciphertext, keys) {
     const threshold = SCORE_THRESHOLD * 0.5;
     const MAX_TRANSFORMS_PER_KEY = 2;
     
+    // Test specific keys with all attack variants + adaptive transforms    if (TEST_SPECIFIC_KEYS.length > 0 && keys.length === 0) {
+        for (const testKey of TEST_SPECIFIC_KEYS) {
+            const variants = getAttackVariants(ciphertext, testKey);
+            for (const variant of variants) {
+                let decryptAlphabet = ALPHABET;
+                let decryptPosArray = ALPHABET_POS_ARRAY;
+                
+                if (variant.customAlphabet) {
+                    decryptAlphabet = variant.customAlphabet;
+                    decryptPosArray = new Uint8Array(256);
+                    decryptPosArray.fill(255);
+                    for (let i = 0; i < decryptAlphabet.length; i++) {
+                        decryptPosArray[decryptAlphabet.charCodeAt(i)] = i;
+                    }
+                }
+                
+                const plaintext = vigenereDecrypt(variant.text, variant.key, decryptAlphabet, decryptPosArray);
+                if (!plaintext) continue;
+                
+                let baseScore = scoreText(plaintext);
+                let bestResult = { plaintext, key: testKey, score: baseScore, transforms: [], patterns: [], attack: variant.attack };
+                
+                // Adaptive pattern-based transformations
+                const patterns = PatternEngine.detect(plaintext);
+                if (patterns.length > 0) {
+                    let currentText = plaintext;
+                    let currentKey = testKey;
+                    let currentScore = baseScore;
+                    let appliedTransforms = [];
+                    let detectedPatterns = [];
+                    
+                    for (const pattern of patterns) {
+                        if (appliedTransforms.length >= MAX_TRANSFORMS_PER_KEY) break;
+                        const suggested = PatternEngine.getSuggestedTransforms(pattern);
+                        for (const transformName of suggested) {
+                            const result = TransformEngine.apply(currentText, currentKey, decryptAlphabet, transformName, pattern);
+                            const transformedText = result.text;
+                            const transformedKey = result.key || currentKey;
+                            if (!transformedText || transformedText === currentText) continue;
+                            const newScore = scoreText(transformedText);
+                            const improvement = newScore - currentScore;
+                            if (improvement > 0.5) {
+                                currentText = transformedText;
+                                currentKey = transformedKey;
+                                currentScore = newScore;
+                                appliedTransforms.push(transformName.split('_').pop() + '[' + pattern.type + ']');
+                                detectedPatterns.push(pattern.type);
+                                if (currentScore > bestResult.score) {
+                                    bestResult = { plaintext: currentText, key: currentKey, score: currentScore, transforms: appliedTransforms.slice(), patterns: detectedPatterns.slice(), attack: variant.attack, baseScore: baseScore };
+                                }                            }
+                        }
+                    }
+                }
+                
+                if (bestResult.score > threshold) {
+                    results.push({
+                        key: bestResult.key,
+                        plaintext: bestResult.plaintext,
+                        score: parseFloat(bestResult.score.toFixed(2)),
+                        baseScore: parseFloat((bestResult.baseScore || bestResult.score).toFixed(2)),
+                        transforms: bestResult.transforms,
+                        patterns: bestResult.patterns,
+                        attack: bestResult.attack,
+                        attackDescription: variant.description,
+                        isSpecificKey: true
+                    });
+                }
+            }
+        }
+    }
+    
+    // Regular brute force with adaptive transforms
     for (const key of keys) {
         try {
-            const plaintext = vigenereDecrypt(ciphertext, key);
+            const plaintext = vigenereDecrypt(ciphertext, key, ALPHABET, ALPHABET_POS_ARRAY);
             if (!plaintext) continue;
             
             let baseScore = scoreText(plaintext);
-            let bestResult = {
-                plaintext,
-                key,
-                score: baseScore,
-                transforms: [],
-                patterns: []
-            };
+            let bestResult = { plaintext, key, score: baseScore, transforms: [], patterns: [], attack: 'bruteforce' };
             
             const patterns = PatternEngine.detect(plaintext);
-                        if (patterns.length > 0) {
+            if (patterns.length > 0) {
                 let currentText = plaintext;
                 let currentKey = key;
                 let currentScore = baseScore;
@@ -350,35 +431,21 @@ function processBatch(ciphertext, keys) {
                 
                 for (const pattern of patterns) {
                     if (appliedTransforms.length >= MAX_TRANSFORMS_PER_KEY) break;
-                    
                     const suggested = PatternEngine.getSuggestedTransforms(pattern);
-                    
                     for (const transformName of suggested) {
                         const result = TransformEngine.apply(currentText, currentKey, ALPHABET, transformName, pattern);
                         const transformedText = result.text;
                         const transformedKey = result.key || currentKey;
-                        
                         if (!transformedText || transformedText === currentText) continue;
-                        
                         const newScore = scoreText(transformedText);
                         const improvement = newScore - currentScore;
-                        
-                        if (improvement > 0.5) {
-                            currentText = transformedText;
+                        if (improvement > 0.5) {                            currentText = transformedText;
                             currentKey = transformedKey;
                             currentScore = newScore;
                             appliedTransforms.push(transformName.split('_').pop() + '[' + pattern.type + ']');
                             detectedPatterns.push(pattern.type);
-                            
                             if (currentScore > bestResult.score) {
-                                bestResult = {
-                                    plaintext: currentText,
-                                    key: currentKey,
-                                    score: currentScore,
-                                    transforms: appliedTransforms.slice(),
-                                    patterns: detectedPatterns.slice(),
-                                    baseScore: baseScore
-                                };
+                                bestResult = { plaintext: currentText, key: currentKey, score: currentScore, transforms: appliedTransforms.slice(), patterns: detectedPatterns.slice(), attack: 'bruteforce', baseScore: baseScore };
                             }
                         }
                     }
@@ -390,8 +457,12 @@ function processBatch(ciphertext, keys) {
                     key: bestResult.key,
                     plaintext: bestResult.plaintext,
                     score: parseFloat(bestResult.score.toFixed(2)),
-                    baseScore: parseFloat((bestResult.baseScore || bestResult.score).toFixed(2)),                    transforms: bestResult.transforms,
-                    patterns: bestResult.patterns
+                    baseScore: parseFloat((bestResult.baseScore || bestResult.score).toFixed(2)),
+                    transforms: bestResult.transforms,
+                    patterns: bestResult.patterns,
+                    attack: bestResult.attack,
+                    attackDescription: 'Brute force',
+                    isSpecificKey: false
                 });
             }
         } catch (e) {
@@ -401,12 +472,10 @@ function processBatch(ciphertext, keys) {
     }
     
     const batchTime = performance.now() - startTime;
-    const currentSpeed = batchTime > 0 ? Math.round((keys.length / batchTime) * 1000) : 0;
-    
     return {
         keysTested: keys.length,
-        results: results,
-        currentSpeed: currentSpeed
+        results,
+        currentSpeed: batchTime > 0 ? Math.round((keys.length / batchTime) * 1000) : 0
     };
 }
 
@@ -414,11 +483,12 @@ onmessage = function(e) {
     if (e.data.type === 'init') {
         ALPHABET = e.data.alphabet || "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         ALPHABET_SIZE = ALPHABET.length;
+        CIPHERTEXT = e.data.ciphertext || "";
         CIPHERTEXT_LENGTH = e.data.ciphertextLength || 0;
         KNOWN_TEXT = e.data.knownText || "";
         BATCH_SIZE = e.data.batchSize || 100000;
         SCORE_THRESHOLD = e.data.scoreThreshold || 1.0;
-        WORKER_ID = e.data.workerId || 0;
+        WORKER_ID = e.data.workerId || 0;        TEST_SPECIFIC_KEYS = e.data.testSpecificKeys || [];
         
         initAlphabetPositions();
         compileKnownFragments();
