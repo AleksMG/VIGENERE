@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Military-Grade Vigenère Cipher Cracker v7.3</title>
+    <title>Military-Grade Vigenère Cipher Cracker v7.4</title>
     <style>
         :root {
             --bg: #0a0a12;
@@ -327,7 +327,7 @@
 <body>
     <div class="container">
         <div class="panel">
-            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.3 ▪</h1>
+            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.4 ▪</h1>
             <p>Advanced brute-force attack system with adaptive pattern detection and auto-transformations</p>
             
             <label for="ciphertext">Ciphertext:</label>
@@ -376,9 +376,9 @@
                 <div class="input-grid">
                     <div>
                         <label for="worker-count">Worker Count: <span class="tooltip">(?)
-                            <span class="tooltiptext">Number of parallel workers (default: 90% of CPU cores)</span>
+                            <span class="tooltiptext">Number of parallel workers (0=auto, max 4)</span>
                         </span></label>
-                        <input type="number" id="worker-count" value="0" min="1" max="32">
+                        <input type="number" id="worker-count" value="0" min="0" max="4">
                     </div>
                     <div>
                         <label for="score-threshold">Score Threshold: <span class="tooltip">(?)
@@ -519,8 +519,14 @@
 
             getWorkerCount() {
                 const inputCount = parseInt(document.getElementById('worker-count').value);
-                if (inputCount > 0) return inputCount;
-                return Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) * 0.90));
+                const MAX_WORKERS = 4; // 🔧 HARD LIMIT
+                
+                if (inputCount > 0) {
+                    return Math.min(inputCount, MAX_WORKERS);
+                }
+                
+                const autoCount = Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) * 0.90));
+                return Math.min(autoCount, MAX_WORKERS);
             }
 
             getBatchSize() {
@@ -531,13 +537,13 @@
                 return parseFloat(document.getElementById('score-threshold').value) || 1.0;
             }
 
-            async startAttack() {
-                const ciphertext = document.getElementById('ciphertext').value.trim().replace(/\s+/g, '').toUpperCase();
+            async startAttack() {                const ciphertext = document.getElementById('ciphertext').value.trim().replace(/\s+/g, '').toUpperCase();
                 const knownText = document.getElementById('known-text').value.toUpperCase();
                 const minKeyLength = parseInt(document.getElementById('min-key-length').value) || 3;
                 const maxKeyLength = parseInt(document.getElementById('max-key-length').value) || 12;
                 const alphabet = this.getCurrentAlphabet();
-                                const alphabetValidation = this.validateAlphabet(alphabet);
+                
+                const alphabetValidation = this.validateAlphabet(alphabet);
                 if (!alphabetValidation.valid) {
                     this.updateStatus(`ERROR: ${alphabetValidation.message}`, true);
                     return;
@@ -581,12 +587,12 @@
                 document.getElementById('total-keys').textContent = this.keyGenerator.totalKeys.toLocaleString();
 
                 this.createKeyLengthProgressBars(minKeyLength, maxKeyLength);
-
                 const workerCount = this.getWorkerCount();
                 await this.createWorkers(workerCount, ciphertext, knownText, alphabet);
 
                 this.updateInterval = setInterval(() => this.updateDashboard(), 250);
             }
+
             createKeyLengthProgressBars(minLen, maxLen) {
                 const container = document.getElementById('key-length-progress');
                 
@@ -629,13 +635,13 @@
                             ciphertextLength: ciphertext.length,
                             knownText: knownText,
                             batchSize: batchSize,
-                            scoreThreshold: scoreThreshold
-                        });
+                            scoreThreshold: scoreThreshold                        });
 
                         worker.onmessage = (e) => {
                             if (!this.isRunning) return;
                             
-                            const { keysTested, results, currentSpeed, workerId } = e.data;                            
+                            const { keysTested, results, currentSpeed, workerId } = e.data;
+                            
                             this.workerSpeeds.set(workerId, currentSpeed || 0);
                             this.workerKeysTested.set(workerId, (this.workerKeysTested.get(workerId) || 0) + keysTested);
                             this.keysTested += keysTested;
@@ -650,7 +656,10 @@
 
                         worker.onerror = (e) => {
                             console.error(`Worker ${i} error:`, e);
-                            this.updateStatus(`Worker ${i+1} encountered an error`, true);
+                            console.error(`Error message:`, e.message);
+                            console.error(`Error filename:`, e.filename);
+                            console.error(`Error lineno:`, e.lineno);
+                            this.updateStatus(`Worker ${i+1} error: ${e.message} (line ${e.lineno})`, true);
                             this.workerTasks.set(i, false);
                         };
 
@@ -676,7 +685,6 @@
                     }
                 }
             }
-
             assignWork(workerId, ciphertext) {
                 if (!this.isRunning || !this.workers[workerId] || this.workerTasks.get(workerId)) {
                     return;
@@ -684,7 +692,8 @@
                 
                 const batch = this.keyGenerator.getNextBatchForWorker(workerId, this.getBatchSize());
                 
-                if (batch.length > 0) {                    this.workerTasks.set(workerId, true);
+                if (batch.length > 0) {
+                    this.workerTasks.set(workerId, true);
                     this.workers[workerId].postMessage({
                         type: 'process',
                         ciphertext: ciphertext,
@@ -724,8 +733,7 @@
                             this.topResults.push({
                                 key: result.key,
                                 plaintext: result.plaintext,
-                                score: score,
-                                timestamp: now,
+                                score: score,                                timestamp: now,
                                 transforms: result.transforms || [],
                                 patterns: result.patterns || [],
                                 baseScore: result.baseScore || score
@@ -733,7 +741,8 @@
                         }
                         
                         this.topResults.sort((a, b) => {
-                            if (b.score !== a.score) return b.score - a.score;                            return b.timestamp - a.timestamp;
+                            if (b.score !== a.score) return b.score - a.score;
+                            return b.timestamp - a.timestamp;
                         });
                         
                         if (this.topResults.length > 15) {
@@ -773,8 +782,7 @@
                     
                     if (index === 0 && result.score > 1.0) {
                         div.style.borderLeftColor = 'var(--warning)';
-                        div.style.background = 'rgba(255, 158, 0, 0.1)';
-                    }
+                        div.style.background = 'rgba(255, 158, 0, 0.1)';                    }
                     
                     const transformsHtml = result.transforms && result.transforms.length > 0
                         ? `<div class="transform-chain">${result.transforms.map(t => 
@@ -782,7 +790,8 @@
                         : '';
                     
                     const patternsHtml = result.patterns && result.patterns.length > 0
-                        ? `<div class="pattern-tag">Patterns: ${result.patterns.join(', ')}</div>`                        : '';
+                        ? `<div class="pattern-tag">Patterns: ${result.patterns.join(', ')}</div>`
+                        : '';
                     
                     let scoreDisplay = `${result.score.toFixed(2)}`;
                     if (result.baseScore && result.transforms.length > 0) {
@@ -822,8 +831,7 @@
                 const timeElapsed = (now - this.lastUpdateTime) / 1000;
                 
                 let totalSpeed = 0;
-                let totalKeys = 0;
-                this.workerSpeeds.forEach((speed, workerId) => {
+                let totalKeys = 0;                this.workerSpeeds.forEach((speed, workerId) => {
                     totalSpeed += speed;
                     totalKeys += this.workerKeysTested.get(workerId) || 0;
                 });
@@ -831,7 +839,8 @@
                 this.keysTested = totalKeys;
                 
                 if (totalSpeed > 0) {
-                    this.speedSamples.push(totalSpeed);                    if (this.speedSamples.length > this.maxSpeedSamples) {
+                    this.speedSamples.push(totalSpeed);
+                    if (this.speedSamples.length > this.maxSpeedSamples) {
                         this.speedSamples.shift();
                     }
                 }
@@ -871,7 +880,6 @@
                 
                 this.lastUpdateTime = now;
             }
-
             updateStatus(message, isError = false, type = '') {
                 const statusEl = document.getElementById('status');
                 statusEl.textContent = `STATUS: ${message}`;
@@ -880,7 +888,8 @@
                 if (isError) {
                     statusEl.classList.add('error');
                 } else if (type === 'warning') {
-                    statusEl.classList.add('warning');                }
+                    statusEl.classList.add('warning');
+                }
             }
 
             checkCompletion() {
@@ -920,8 +929,7 @@
             }
 
             formatTime(seconds) {
-                if (seconds <= 0) return '-';
-                
+                if (seconds <= 0) return '-';                
                 const days = Math.floor(seconds / 86400);
                 const hrs = Math.floor((seconds % 86400) / 3600);
                 const mins = Math.floor((seconds % 3600) / 60);
@@ -929,7 +937,8 @@
                 
                 let timeStr = '';
                 if (days > 0) timeStr += `${days}d `;
-                if (hrs > 0 || days > 0) timeStr += `${hrs}h `;                if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
+                if (hrs > 0 || days > 0) timeStr += `${hrs}h `;
+                if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
                 timeStr += `${secs}s`;
                 
                 return timeStr.trim();
@@ -969,8 +978,7 @@
                         endIndex: this.totalKeys + keysAtLength - 1,
                         keysTotal: keysAtLength,
                         nextIndex: 0
-                    });
-                    this.totalKeys += keysAtLength;
+                    });                    this.totalKeys += keysAtLength;
                 }
             }
 
@@ -978,7 +986,8 @@
                 if (!this.workerAssignments.has(workerId)) {
                     const lengthIndex = workerId % this.keysByLength.length;
                     this.workerAssignments.set(workerId, {
-                        lengthIndex,                        nextIndex: this.keysByLength[lengthIndex].nextIndex
+                        lengthIndex,
+                        nextIndex: this.keysByLength[lengthIndex].nextIndex
                     });
                 }
                 
@@ -1018,8 +1027,7 @@
             generateKeyForLength(length, index) {
                 let key = "";
                 let remaining = index;
-                
-                for (let i = 0; i < length; i++) {
+                                for (let i = 0; i < length; i++) {
                     const pos = remaining % this.alphabetSize;
                     key = this.alphabet.charAt(pos) + key;
                     remaining = Math.floor(remaining / this.alphabetSize);
@@ -1028,6 +1036,7 @@
                 return key;
             }
         }
+
         // ======================
         // INITIALIZE THE SYSTEM
         // ======================
