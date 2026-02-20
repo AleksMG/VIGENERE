@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Military-Grade Vigenère Cipher Cracker v7.4</title>
+    <title>Vigenère Cipher Cracker v7.5</title>
     <style>
         :root {
             --bg: #0a0a12;
@@ -14,7 +14,6 @@
             --danger: #ef233c;
             --warning: #ff9e00;
         }
-        
         body {
             background: var(--bg);
             color: var(--text);
@@ -23,49 +22,35 @@
             padding: 20px;
             line-height: 1.5;
         }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
+        .container { max-width: 1200px; margin: 0 auto; }
         .panel {
             background: var(--panel);
             border: 1px solid #2a2a3a;
             border-radius: 5px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
         h1, h2, h3 {
             color: var(--accent);
             margin-top: 0;
             border-bottom: 1px solid #2a2a3a;
             padding-bottom: 10px;
         }
-        
         textarea, input, select {
             background: #0a0a12;
-            border: 1px solid #2a2a3a;            color: var(--text);
+            border: 1px solid #2a2a3a;
+            color: var(--text);
             padding: 10px;
             width: 100%;
             margin-bottom: 15px;
             font-family: inherit;
             border-radius: 4px;
-            transition: border-color 0.3s;
+            box-sizing: border-box;
         }
-        
-        textarea:focus, input:focus, select:focus {
-            border-color: var(--accent);
+        textarea:focus, input:focus, select:focus {            border-color: var(--accent);
             outline: none;
         }
-        
-        textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-        
+        textarea { min-height: 100px; resize: vertical; }
         .btn {
             padding: 10px 20px;
             border: none;
@@ -76,32 +61,11 @@
             transition: all 0.3s;
             font-family: inherit;
         }
-        
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
-        }
-        
-        .btn-start {
-            background: var(--success);
-            color: white;
-        }
-        
-        .btn-stop {
-            background: var(--danger);
-            color: white;
-        }
-        
-        .btn:disabled {            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn:active { transform: translateY(0); }
+        .btn-start { background: var(--success); color: white; }
+        .btn-stop { background: var(--danger); color: white; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
         .status {
             margin: 15px 0;
             padding: 12px;
@@ -109,25 +73,17 @@
             border-left: 4px solid var(--accent);
             border-radius: 0 4px 4px 0;
         }
-        
-        .status.error {
-            border-left-color: var(--danger);
-        }
-        
-        .status.warning {
-            border-left-color: var(--warning);
-        }
-        
+        .status.error { border-left-color: var(--danger); }
+        .status.warning { border-left-color: var(--warning); }
         .worker {
             display: flex;
             align-items: center;
             margin-bottom: 10px;
             font-size: 14px;
             padding: 8px;
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0,0,0,0.2);
             border-radius: 4px;
         }
-        
         .worker-progress {
             flex-grow: 1;
             height: 8px;
@@ -136,25 +92,19 @@
             border-radius: 4px;
             overflow: hidden;
         }
-        
         .progress-bar {
             height: 100%;
             background: var(--accent);
             transition: width 0.3s;
-        }
-        
-        .result {
+        }        .result {
             padding: 15px;
-            margin-bottom: 10px;            background: rgba(56, 176, 0, 0.05);
+            margin-bottom: 10px;
+            background: rgba(56,176,0,0.05);
             border-left: 4px solid var(--success);
             border-radius: 0 4px 4px 0;
             transition: all 0.3s;
         }
-        
-        .result:hover {
-            background: rgba(56, 176, 0, 0.15);
-        }
-        
+        .result:hover { background: rgba(56,176,0,0.15); }
         .result-header {
             display: flex;
             justify-content: space-between;
@@ -164,14 +114,12 @@
             flex-wrap: wrap;
             gap: 10px;
         }
-        
         .transform-chain {
             display: flex;
             gap: 5px;
             flex-wrap: wrap;
             margin: 8px 0;
         }
-        
         .transform-badge {
             background: var(--accent);
             color: #000;
@@ -181,69 +129,50 @@
             font-weight: bold;
             text-transform: uppercase;
         }
-        
+        .attack-badge {
+            background: var(--warning);
+            color: #000;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
         .pattern-tag {
-            background: rgba(255, 158, 0, 0.3);
+            background: rgba(255,158,0,0.3);
             color: var(--warning);
             padding: 2px 6px;
             border-radius: 3px;
             font-size: 10px;
             margin-top: 5px;
-            display: inline-block;
-        }
-        
-        .score-detail {
-            font-size: 12px;
-            opacity: 0.8;            margin-top: 5px;
-        }
-        
-        .score-improvement {
-            color: var(--success);
-            font-weight: bold;
-        }
-        
+            display: inline-block;        }
+        .score-improvement { color: var(--success); font-weight: bold; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 20px;
         }
-        
         .stat-box {
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0,0,0,0.2);
             padding: 15px;
             border-radius: 4px;
         }
-        
-        .stat-label {
-            font-size: 0.9em;
-            opacity: 0.8;
-            margin-bottom: 5px;
-        }
-        
-        .stat-value {
-            font-weight: bold;
-            font-size: 1.2em;
-        }
-        
+        .stat-label { font-size: 0.9em; opacity: 0.8; margin-bottom: 5px; }
+        .stat-value { font-weight: bold; font-size: 1.2em; }
         .input-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 15px;
         }
-        
-        .tooltip {
-            position: relative;
-            display: inline-block;
-            cursor: help;
-        }
-        
+        .tooltip { position: relative; display: inline-block; cursor: help; }
         .tooltip .tooltiptext {
             visibility: hidden;
             width: 200px;
             background-color: #333;
-            color: #fff;            text-align: center;
+            color: #fff;
+            text-align: center;
             border-radius: 6px;
             padding: 5px;
             position: absolute;
@@ -255,105 +184,72 @@
             transition: opacity 0.3s;
             font-size: 0.8em;
         }
-        
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
-        }
-        
-        .highlight {
-            background-color: rgba(255, 255, 0, 0.3);
-            padding: 2px;
-            border-radius: 2px;
-        }
-        
+        .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+        .highlight { background-color: rgba(255,255,0,0.3); padding: 2px; border-radius: 2px; }
         .settings-toggle {
             display: flex;
             align-items: center;
             margin-bottom: 15px;
             cursor: pointer;
         }
-        
-        .settings-toggle span {
-            margin-left: 8px;
-        }
-        
+        .settings-toggle span { margin-left: 8px; }
         .settings-panel {
-            display: none;
-            margin-top: 15px;
+            display: none;            margin-top: 15px;
             padding: 15px;
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0,0,0,0.2);
             border-radius: 4px;
         }
-        
-        .settings-panel.active {
-            display: block;
-        }
-        
-        .key-length-progress {
-            margin-top: 10px;
-        }        
-        .key-length-item {
-            margin-bottom: 5px;
-        }
-        
+        .settings-panel.active { display: block; }
+        .key-length-progress { margin-top: 10px; }
+        .key-length-item { margin-bottom: 5px; }
         .key-length-label {
             display: flex;
             justify-content: space-between;
             font-size: 0.8em;
             margin-bottom: 3px;
         }
-        
         .key-length-bar {
             height: 6px;
             background: #2a2a3a;
             border-radius: 3px;
             overflow: hidden;
         }
-        
         .key-length-progress-bar {
             height: 100%;
             background: var(--accent);
             width: 0%;
         }
-        
         @media (max-width: 768px) {
-            .input-grid, .stats-grid {
-                grid-template-columns: 1fr;
-            }
+            .input-grid, .stats-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="panel">
-            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.4 ▪</h1>
-            <p>Advanced brute-force attack system with adaptive pattern detection and auto-transformations</p>
+            <h1>▪ VIGENÈRE CIPHER CRACKER v7.5 ▪</h1>
+            <p>Advanced brute-force with pattern detection, auto-transformations, and multiple attack vectors</p>
             
             <label for="ciphertext">Ciphertext:</label>
-            <textarea id="ciphertext" rows="5" placeholder="Enter ciphertext (letters only, no spaces or punctuation)...">OBKRUOXOGHULBSOLIFBBWFLRVQQPRNGKSSOTWTQSJQSSEKZZWATJKLUDIAWINFBNYPVTTMZFPKWGDKZXTJCDIGKUHUAUEKCAR</textarea>
+            <textarea id="ciphertext" rows="5" placeholder="Enter ciphertext...">OBKRUOXOGHULBSOLIFBBWFLRVQQPRNGKSSOTWTQSJQSSEKZZWATJKLUDIAWINFBNYPVTTMZFPKWGDKZXTJCDIGKUHUAUEKCAR</textarea>
             
             <div class="input-grid">
                 <div>
-                    <label for="known-text">Known plaintext fragments: <span class="tooltip">(?)
-                        <span class="tooltiptext">Comma-separated words/phrases you expect to find in the plaintext</span>
-                    </span></label>
-                    <input type="text" id="known-text" placeholder="BERLIN,EAST,NORTH,CLOCK" value="BERLIN,EAST,NORTH,CLOCK">
+                    <label for="known-text">Known plaintext fragments:</label>
+                    <input type="text" id="known-text" placeholder="BERLIN,EAST,NORTH" value="BERLIN,EAST,NORTH,CLOCK">
                 </div>
                 <div>
-                    <label for="key-length">Key length range: <span class="tooltip">(?)                        <span class="tooltiptext">Range of key lengths to test (most common are 3-12)</span>
-                    </span></label>
+                    <label for="key-length">Key length range:</label>
                     <div style="display: flex; gap: 10px;">
                         <input type="number" id="min-key-length" value="3" min="1" max="50" style="width: 50%;">
                         <input type="number" id="max-key-length" value="12" min="1" max="50" style="width: 50%;">
-                    </div>
-                </div>
+                    </div>                </div>
             </div>
 
             <div class="settings-toggle" id="settings-toggle">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
                     <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                 </svg>
                 <span>Advanced Settings</span>
             </div>
@@ -361,85 +257,66 @@
             <div class="settings-panel" id="settings-panel">
                 <div class="input-grid">
                     <div>
-                        <label for="custom-alphabet">Custom Alphabet: <span class="tooltip">(?)
-                            <span class="tooltiptext">Custom alphabet for the cipher (e.g., A-Z, A-Z0-9, etc.)</span>
-                        </span></label>
-                        <input type="text" id="custom-alphabet" placeholder="Leave blank for standard A-Z" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ">
+                        <label for="custom-alphabet">Custom Alphabet:</label>
+                        <input type="text" id="custom-alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ">
                     </div>
                     <div>
-                        <label for="batch-size">Worker Batch Size: <span class="tooltip">(?)
-                            <span class="tooltiptext">Keys per batch per worker (adjust for performance)</span>
-                        </span></label>
+                        <label for="batch-size">Batch Size:</label>
                         <input type="number" id="batch-size" value="100000" min="1000" max="500000">
                     </div>
                 </div>
                 <div class="input-grid">
                     <div>
-                        <label for="worker-count">Worker Count: <span class="tooltip">(?)
-                            <span class="tooltiptext">Number of parallel workers (0=auto, max 4)</span>
-                        </span></label>
+                        <label for="worker-count">Worker Count (max 4):</label>
                         <input type="number" id="worker-count" value="0" min="0" max="4">
                     </div>
                     <div>
-                        <label for="score-threshold">Score Threshold: <span class="tooltip">(?)
-                            <span class="tooltiptext">Minimum score to display results (higher = stricter)</span>
-                        </span></label>
+                        <label for="score-threshold">Score Threshold:</label>
                         <input type="number" id="score-threshold" value="1.0" min="0.1" max="10" step="0.1">
+                    </div>
+                </div>
+                <div class="input-grid">
+                    <div>
+                        <label for="test-specific-keys">Test Specific Keys:</label>
+                        <input type="text" id="test-specific-keys" placeholder="ABSCISSA,PALIMPSEST" value="">
                     </div>
                 </div>
             </div>
 
             <div style="margin-top: 15px;">
-                <button id="start" class="btn btn-start">INITIATE ATTACK SEQUENCE</button>                <button id="stop" class="btn btn-stop" disabled>TERMINATE PROCESS</button>
+                <button id="start" class="btn btn-start">INITIATE ATTACK</button>
+                <button id="stop" class="btn btn-stop" disabled>TERMINATE</button>
             </div>
         </div>
 
         <div class="panel">
             <h2>▪ SYSTEM STATUS ▪</h2>
-            <div class="status" id="status">STATUS: READY FOR OPERATION</div>
-            
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-label">TOTAL KEYS TESTED</div>
-                    <div class="stat-value" id="keys-tried">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">CRACKING SPEED</div>
-                    <div class="stat-value" id="speed">0 keys/sec</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">ESTIMATED TIME REMAINING</div>
-                    <div class="stat-value" id="eta">-</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">POSSIBLE KEYS</div>
-                    <div class="stat-value" id="total-keys">0</div>
-                </div>
+            <div class="status" id="status">STATUS: READY</div>
+            <div class="stats-grid">                <div class="stat-box"><div class="stat-label">KEYS TESTED</div><div class="stat-value" id="keys-tried">0</div></div>
+                <div class="stat-box"><div class="stat-label">SPEED</div><div class="stat-value" id="speed">0 keys/sec</div></div>
+                <div class="stat-box"><div class="stat-label">ETA</div><div class="stat-value" id="eta">-</div></div>
+                <div class="stat-box"><div class="stat-label">POSSIBLE KEYS</div><div class="stat-value" id="total-keys">0</div></div>
             </div>
-
             <h3>KEY LENGTH PROGRESS</h3>
             <div class="key-length-progress" id="key-length-progress"></div>
-
             <h3>WORKER THREADS</h3>
             <div id="workers"></div>
         </div>
 
         <div class="panel">
-            <h2>▪ TOP DECRYPTION RESULTS ▪</h2>
-            <p>Sorted by probability score (higher is better). Results may include auto-applied transformations.</p>
+            <h2>▪ RESULTS ▪</h2>
+            <p>Shows attack type, transformations applied, and score improvement.</p>
             <div id="results"></div>
         </div>
     </div>
 
     <script>
-        // ======================
-        // CORE CRACKING ENGINE
-        // ======================
         class VigenereCracker {
             constructor() {
                 this.workers = [];
                 this.keysTested = 0;
-                this.startTime = 0;                this.isRunning = false;
+                this.startTime = 0;
+                this.isRunning = false;
                 this.topResults = [];
                 this.workerSpeeds = new Map();
                 this.workerKeysTested = new Map();
@@ -449,7 +326,6 @@
                 this.speedSamples = [];
                 this.maxSpeedSamples = 100;
                 this.workerTasks = new Map();
-                
                 this.initControls();
                 this.initPerformanceWarning();
                 this.initSettingsToggle();
@@ -461,109 +337,68 @@
             }
 
             initSettingsToggle() {
-                const toggle = document.getElementById('settings-toggle');
-                const panel = document.getElementById('settings-panel');
-                
-                toggle.addEventListener('click', () => {
-                    panel.classList.toggle('active');
+                document.getElementById('settings-toggle').addEventListener('click', () => {
+                    document.getElementById('settings-panel').classList.toggle('active');
                 });
             }
-
             initPerformanceWarning() {
-                const minKeyLength = document.getElementById('min-key-length');
-                const maxKeyLength = document.getElementById('max-key-length');
-                
                 const updateTotalKeys = () => {
-                    const minLen = parseInt(minKeyLength.value) || 3;
-                    const maxLen = parseInt(maxKeyLength.value) || 12;
+                    const minLen = parseInt(document.getElementById('min-key-length').value) || 3;
+                    const maxLen = parseInt(document.getElementById('max-key-length').value) || 12;
                     const alphabet = this.getCurrentAlphabet();
-                    
                     let totalKeys = 0;
                     for (let len = minLen; len <= maxLen; len++) {
                         totalKeys += Math.pow(alphabet.length, len);
                     }
-                    
                     document.getElementById('total-keys').textContent = totalKeys.toLocaleString();
-                    
                     if (maxLen >= 8) {
-                        this.updateStatus(`WARNING: Testing keys up to ${maxLen} characters may take a very long time.`, false, 'warning');
+                        this.updateStatus('WARNING: Long keys may take very long time.', false, 'warning');
                     }
-                };                
-                minKeyLength.addEventListener('change', updateTotalKeys);
-                maxKeyLength.addEventListener('change', updateTotalKeys);
-                
+                };
+                document.getElementById('min-key-length').addEventListener('change', updateTotalKeys);
+                document.getElementById('max-key-length').addEventListener('change', updateTotalKeys);
                 updateTotalKeys();
             }
 
             getCurrentAlphabet() {
-                const customAlphabet = document.getElementById('custom-alphabet').value.trim().toUpperCase();
-                if (customAlphabet && customAlphabet.length > 0) {
-                    const uniqueChars = [...new Set(customAlphabet.split(''))].sort();
-                    return uniqueChars.join('');
+                const custom = document.getElementById('custom-alphabet').value.trim().toUpperCase();
+                if (custom && custom.length > 0) {
+                    return [...new Set(custom.split(''))].sort().join('');
                 }
                 return "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             }
 
             validateAlphabet(alphabet) {
-                if (!alphabet || alphabet.length === 0) {
-                    return { valid: false, message: "Alphabet cannot be empty" };
-                }
-                
-                const uniqueChars = new Set(alphabet);
-                if (uniqueChars.size !== alphabet.length) {
-                    return { valid: false, message: "Alphabet contains duplicate characters" };
-                }
-                
+                if (!alphabet || alphabet.length === 0) return { valid: false, message: "Alphabet cannot be empty" };
+                if (new Set(alphabet).size !== alphabet.length) return { valid: false, message: "Duplicate characters in alphabet" };
                 return { valid: true };
             }
 
             getWorkerCount() {
                 const inputCount = parseInt(document.getElementById('worker-count').value);
-                const MAX_WORKERS = 4; // 🔧 HARD LIMIT
-                
-                if (inputCount > 0) {
-                    return Math.min(inputCount, MAX_WORKERS);
-                }
-                
-                const autoCount = Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) * 0.90));
-                return Math.min(autoCount, MAX_WORKERS);
+                const MAX_WORKERS = 4;
+                if (inputCount > 0) return Math.min(inputCount, MAX_WORKERS);
+                return Math.min(Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) * 0.90)), MAX_WORKERS);
             }
 
-            getBatchSize() {
-                return parseInt(document.getElementById('batch-size').value) || 100000;
+            getBatchSize() { return parseInt(document.getElementById('batch-size').value) || 100000; }
+            getScoreThreshold() { return parseFloat(document.getElementById('score-threshold').value) || 1.0; }
+            getSpecificKeys() {
+                const val = document.getElementById('test-specific-keys').value.trim().toUpperCase();
+                return val ? val.split(',').filter(k => k.trim()) : [];
             }
 
-            getScoreThreshold() {
-                return parseFloat(document.getElementById('score-threshold').value) || 1.0;
-            }
-
-            async startAttack() {                const ciphertext = document.getElementById('ciphertext').value.trim().replace(/\s+/g, '').toUpperCase();
-                const knownText = document.getElementById('known-text').value.toUpperCase();
-                const minKeyLength = parseInt(document.getElementById('min-key-length').value) || 3;
+            async startAttack() {
+                const ciphertext = document.getElementById('ciphertext').value.trim().replace(/\s+/g, '').toUpperCase();
+                const knownText = document.getElementById('known-text').value.toUpperCase();                const minKeyLength = parseInt(document.getElementById('min-key-length').value) || 3;
                 const maxKeyLength = parseInt(document.getElementById('max-key-length').value) || 12;
                 const alphabet = this.getCurrentAlphabet();
                 
-                const alphabetValidation = this.validateAlphabet(alphabet);
-                if (!alphabetValidation.valid) {
-                    this.updateStatus(`ERROR: ${alphabetValidation.message}`, true);
-                    return;
-                }
-                
-                if (!ciphertext) {
-                    this.updateStatus("ERROR: No ciphertext provided", true);
-                    return;
-                }
-
-                const ciphertextRegex = new RegExp(`^[${alphabet}]+$`);
-                if (!ciphertextRegex.test(ciphertext)) {
-                    this.updateStatus(`ERROR: Ciphertext must contain only letters from the current alphabet (${alphabet})`, true);
-                    return;
-                }
-
-                if (minKeyLength > maxKeyLength) {
-                    this.updateStatus("ERROR: Minimum key length cannot be greater than maximum key length", true);
-                    return;
-                }
+                const validation = this.validateAlphabet(alphabet);
+                if (!validation.valid) { this.updateStatus('ERROR: ' + validation.message, true); return; }
+                if (!ciphertext) { this.updateStatus('ERROR: No ciphertext', true); return; }
+                if (!new RegExp('^[' + alphabet + ']+$').test(ciphertext)) { this.updateStatus('ERROR: Invalid characters in ciphertext', true); return; }
+                if (minKeyLength > maxKeyLength) { this.updateStatus('ERROR: Min > Max key length', true); return; }
 
                 this.stopAttack();
                 this.isRunning = true;
@@ -576,7 +411,7 @@
                 this.lastUpdateTime = this.startTime;
                 this.workerTasks = new Map();
                 
-                this.updateStatus("INITIALIZING CRACKING SEQUENCE...");
+                this.updateStatus('INITIALIZING...');
                 document.getElementById('results').innerHTML = '';
                 document.getElementById('workers').innerHTML = '';
                 document.getElementById('key-length-progress').innerHTML = '';
@@ -585,41 +420,30 @@
 
                 this.keyGenerator.init(alphabet, minKeyLength, maxKeyLength);
                 document.getElementById('total-keys').textContent = this.keyGenerator.totalKeys.toLocaleString();
-
                 this.createKeyLengthProgressBars(minKeyLength, maxKeyLength);
-                const workerCount = this.getWorkerCount();
-                await this.createWorkers(workerCount, ciphertext, knownText, alphabet);
 
+                const workerCount = this.getWorkerCount();
+                const specificKeys = this.getSpecificKeys();
+                await this.createWorkers(workerCount, ciphertext, knownText, alphabet, specificKeys);
                 this.updateInterval = setInterval(() => this.updateDashboard(), 250);
             }
 
             createKeyLengthProgressBars(minLen, maxLen) {
                 const container = document.getElementById('key-length-progress');
-                
                 for (let len = minLen; len <= maxLen; len++) {
                     const div = document.createElement('div');
                     div.className = 'key-length-item';
-                    div.innerHTML = `
-                        <div class="key-length-label">
-                            <span>Length ${len}</span>
-                            <span id="key-length-${len}-count">0</span>
-                        </div>
-                        <div class="key-length-bar">
-                            <div class="key-length-progress-bar" id="key-length-${len}-progress"></div>
-                        </div>
-                    `;
+                    div.innerHTML = '<div class="key-length-label"><span>Length ' + len + '</span><span id="key-length-' + len + '-count">0</span></div><div class="key-length-bar"><div class="key-length-progress-bar" id="key-length-' + len + '-progress"></div></div>';
                     container.appendChild(div);
                 }
             }
 
-            async createWorkers(count, ciphertext, knownText, alphabet) {
-                this.workers = [];
-                this.workerSpeeds = new Map();
+            async createWorkers(count, ciphertext, knownText, alphabet, specificKeys) {
+                this.workers = [];                this.workerSpeeds = new Map();
                 this.workerKeysTested = new Map();
                 this.workerTasks = new Map();
                 const workerContainer = document.getElementById('workers');
                 workerContainer.innerHTML = '';
-
                 const batchSize = this.getBatchSize();
                 const scoreThreshold = this.getScoreThreshold();
 
@@ -632,34 +456,28 @@
                             type: 'init',
                             workerId: i,
                             alphabet: alphabet,
+                            ciphertext: ciphertext,
                             ciphertextLength: ciphertext.length,
                             knownText: knownText,
                             batchSize: batchSize,
-                            scoreThreshold: scoreThreshold                        });
+                            scoreThreshold: scoreThreshold,
+                            testSpecificKeys: specificKeys
+                        });
 
                         worker.onmessage = (e) => {
                             if (!this.isRunning) return;
-                            
                             const { keysTested, results, currentSpeed, workerId } = e.data;
-                            
                             this.workerSpeeds.set(workerId, currentSpeed || 0);
                             this.workerKeysTested.set(workerId, (this.workerKeysTested.get(workerId) || 0) + keysTested);
                             this.keysTested += keysTested;
-                            
-                            if (results && results.length > 0) {
-                                this.processResults(results);
-                            }
-                            
+                            if (results && results.length > 0) this.processResults(results);
                             this.workerTasks.set(workerId, false);
                             this.assignWork(workerId, ciphertext);
                         };
 
                         worker.onerror = (e) => {
-                            console.error(`Worker ${i} error:`, e);
-                            console.error(`Error message:`, e.message);
-                            console.error(`Error filename:`, e.filename);
-                            console.error(`Error lineno:`, e.lineno);
-                            this.updateStatus(`Worker ${i+1} error: ${e.message} (line ${e.lineno})`, true);
+                            console.error('Worker ' + i + ' error:', e);
+                            this.updateStatus('Worker ' + (i+1) + ' error: ' + e.message + ' (line ' + e.lineno + ')', true);
                             this.workerTasks.set(i, false);
                         };
 
@@ -669,37 +487,20 @@
                         
                         const workerEl = document.createElement('div');
                         workerEl.className = 'worker';
-                        workerEl.innerHTML = `
-                            <span>WORKER ${i+1}</span>
-                            <div class="worker-progress">
-                                <div class="progress-bar" id="worker-${i}-progress" style="width:0%"></div>
-                            </div>
-                            <span id="worker-${i}-speed">0 keys/s</span>
-                            <span id="worker-${i}-keys">0 keys</span>
-                        `;
-                        workerContainer.appendChild(workerEl);
-
-                        this.assignWork(i, ciphertext);
+                        workerEl.innerHTML = '<span>WORKER ' + (i+1) + '</span><div class="worker-progress"><div class="progress-bar" id="worker-' + i + '-progress" style="width:0%"></div></div><span id="worker-' + i + '-speed">0 keys/s</span><span id="worker-' + i + '-keys">0 keys</span>';
+                        workerContainer.appendChild(workerEl);                        this.assignWork(i, ciphertext);
                     } catch (e) {
-                        console.error(`Failed to create worker ${i}:`, e);
+                        console.error('Failed to create worker ' + i + ':', e);
                     }
                 }
             }
+
             assignWork(workerId, ciphertext) {
-                if (!this.isRunning || !this.workers[workerId] || this.workerTasks.get(workerId)) {
-                    return;
-                }
-                
+                if (!this.isRunning || !this.workers[workerId] || this.workerTasks.get(workerId)) return;
                 const batch = this.keyGenerator.getNextBatchForWorker(workerId, this.getBatchSize());
-                
                 if (batch.length > 0) {
                     this.workerTasks.set(workerId, true);
-                    this.workers[workerId].postMessage({
-                        type: 'process',
-                        ciphertext: ciphertext,
-                        keys: batch,
-                        workerId: workerId
-                    });
+                    this.workers[workerId].postMessage({ type: 'process', ciphertext: ciphertext, keys: batch, workerId: workerId });
                 } else {
                     this.checkCompletion();
                 }
@@ -707,247 +508,154 @@
 
             processResults(results) {
                 if (!results || results.length === 0) return;
-                
                 const threshold = this.getScoreThreshold();
                 const now = Date.now();
                 
                 results.forEach(result => {
                     const score = typeof result.score === 'string' ? parseFloat(result.score) : result.score;
-                    
                     if (score > threshold || this.topResults.length < 15) {
-                        const existingIndex = this.topResults.findIndex(r => r.key === result.key);
-                        
+                        const existingIndex = this.topResults.findIndex(r => r.key === result.key && r.attack === result.attack);
                         if (existingIndex >= 0) {
                             if (score > this.topResults[existingIndex].score) {
-                                this.topResults[existingIndex] = {
-                                    key: result.key,
-                                    plaintext: result.plaintext,
-                                    score: score,
-                                    timestamp: now,
-                                    transforms: result.transforms || [],
-                                    patterns: result.patterns || [],
-                                    baseScore: result.baseScore || score
-                                };
+                                this.topResults[existingIndex] = { ...result, timestamp: now };
                             }
                         } else {
-                            this.topResults.push({
-                                key: result.key,
-                                plaintext: result.plaintext,
-                                score: score,                                timestamp: now,
-                                transforms: result.transforms || [],
-                                patterns: result.patterns || [],
-                                baseScore: result.baseScore || score
-                            });
+                            this.topResults.push({ ...result, timestamp: now });
                         }
-                        
-                        this.topResults.sort((a, b) => {
-                            if (b.score !== a.score) return b.score - a.score;
-                            return b.timestamp - a.timestamp;
-                        });
-                        
-                        if (this.topResults.length > 15) {
-                            this.topResults.pop();
-                        }
+                        this.topResults.sort((a, b) => b.score - a.score || b.timestamp - a.timestamp);
+                        if (this.topResults.length > 15) this.topResults.pop();
                     }
                 });
-                
                 this.updateResultsUI();
             }
 
             highlightMatches(text, known) {
                 if (!known || known.trim() === '') return text;
-                
                 const fragments = known.split(',').map(f => f.trim()).filter(f => f.length > 0);
                 let result = text;
-                
                 for (const fragment of fragments) {
                     const regex = new RegExp(fragment, 'gi');
-                    result = result.replace(regex, match => `<span class="highlight">${match}</span>`);
+                    result = result.replace(regex, match => '<span class="highlight">' + match + '</span>');
                 }
-                
-                return result;
-            }
+                return result;            }
 
             updateResultsUI() {
                 const container = document.getElementById('results');
                 const knownText = document.getElementById('known-text').value.toUpperCase();
-                
                 if (this.topResults.length === 0) return;
                 
                 const fragment = document.createDocumentFragment();
-                
                 this.topResults.forEach((result, index) => {
                     const div = document.createElement('div');
                     div.className = 'result';
-                    
                     if (index === 0 && result.score > 1.0) {
                         div.style.borderLeftColor = 'var(--warning)';
-                        div.style.background = 'rgba(255, 158, 0, 0.1)';                    }
-                    
-                    const transformsHtml = result.transforms && result.transforms.length > 0
-                        ? `<div class="transform-chain">${result.transforms.map(t => 
-                            `<span class="transform-badge">${t}</span>`).join('')}</div>`
-                        : '';
-                    
-                    const patternsHtml = result.patterns && result.patterns.length > 0
-                        ? `<div class="pattern-tag">Patterns: ${result.patterns.join(', ')}</div>`
-                        : '';
-                    
-                    let scoreDisplay = `${result.score.toFixed(2)}`;
-                    if (result.baseScore && result.transforms.length > 0) {
-                        const improvement = (result.score - result.baseScore).toFixed(2);
-                        if (improvement > 0) {
-                            scoreDisplay += ` <span class="score-improvement">(base: ${result.baseScore.toFixed(2)} +${improvement})</span>`;
-                        }
+                        div.style.background = 'rgba(255,158,0,0.1)';
                     }
                     
-                    const displayText = result.plaintext.length > 100 
-                        ? result.plaintext.substring(0, 100) + '...' 
-                        : result.plaintext;
+                    const attackBadge = result.attack ? '<span class="attack-badge">' + result.attack + '</span>' : '';
+                    const transformsHtml = result.transforms && result.transforms.length > 0
+                        ? '<div class="transform-chain">' + result.transforms.map(t => '<span class="transform-badge">' + t + '</span>').join('') + '</div>'
+                        : '';
+                    const patternsHtml = result.patterns && result.patterns.length > 0
+                        ? '<div class="pattern-tag">Patterns: ' + result.patterns.join(', ') + '</div>'
+                        : '';
                     
+                    let scoreDisplay = result.score.toFixed(2);
+                    if (result.baseScore && result.transforms && result.transforms.length > 0) {
+                        const improvement = (result.score - result.baseScore).toFixed(2);
+                        if (improvement > 0) scoreDisplay += ' <span class="score-improvement">(base: ' + result.baseScore.toFixed(2) + ' +' + improvement + ')</span>';
+                    }
+                    
+                    const displayText = result.plaintext.length > 100 ? result.plaintext.substring(0, 100) + '...' : result.plaintext;
                     const highlightedText = this.highlightMatches(displayText, knownText);
                     
-                    div.innerHTML = `
-                        <div class="result-header">
-                            <span>KEY: ${result.key}</span>
-                            <span>SCORE: ${scoreDisplay}</span>
-                        </div>
-                        ${transformsHtml}
-                        <div style="margin:8px 0; word-break: break-all;">${highlightedText}</div>
-                        ${patternsHtml}
-                    `;
-                    
+                    div.innerHTML = '<div class="result-header"><span>KEY: ' + result.key + attackBadge + '</span><span>SCORE: ' + scoreDisplay + '</span></div>' + transformsHtml + '<div style="margin:8px 0; word-break: break-all;">' + highlightedText + '</div>' + patternsHtml;
                     fragment.appendChild(div);
                 });
-                
                 container.innerHTML = '';
                 container.appendChild(fragment);
             }
 
             updateDashboard() {
                 if (!this.isRunning) return;
-                
                 const now = Date.now();
-                const timeElapsed = (now - this.lastUpdateTime) / 1000;
-                
                 let totalSpeed = 0;
-                let totalKeys = 0;                this.workerSpeeds.forEach((speed, workerId) => {
-                    totalSpeed += speed;
-                    totalKeys += this.workerKeysTested.get(workerId) || 0;
-                });
-                
+                let totalKeys = 0;
+                this.workerSpeeds.forEach((speed, id) => { totalSpeed += speed; totalKeys += this.workerKeysTested.get(id) || 0; });
                 this.keysTested = totalKeys;
                 
                 if (totalSpeed > 0) {
-                    this.speedSamples.push(totalSpeed);
-                    if (this.speedSamples.length > this.maxSpeedSamples) {
-                        this.speedSamples.shift();
-                    }
+                    this.speedSamples.push(totalSpeed);                    if (this.speedSamples.length > this.maxSpeedSamples) this.speedSamples.shift();
                 }
-                
-                const smoothedSpeed = this.speedSamples.length > 0 
-                    ? Math.round(this.speedSamples.reduce((sum, speed) => sum + speed, 0) / this.speedSamples.length)
-                    : 0;
+                const smoothedSpeed = this.speedSamples.length > 0 ? Math.round(this.speedSamples.reduce((s, v) => s + v, 0) / this.speedSamples.length) : 0;
                 
                 document.getElementById('keys-tried').textContent = this.keysTested.toLocaleString();
-                document.getElementById('speed').textContent = `${smoothedSpeed.toLocaleString()} keys/sec`;
+                document.getElementById('speed').textContent = smoothedSpeed.toLocaleString() + ' keys/sec';
                 
                 if (smoothedSpeed > 0) {
-                    const remainingKeys = this.keyGenerator.totalKeys - this.keyGenerator.currentIndex;
-                    const etaSeconds = Math.round(remainingKeys / smoothedSpeed);
-                    document.getElementById('eta').textContent = this.formatTime(etaSeconds);
+                    const remaining = this.keyGenerator.totalKeys - this.keyGenerator.currentIndex;
+                    document.getElementById('eta').textContent = this.formatTime(Math.round(remaining / smoothedSpeed));
                 }
                 
-                this.workers.forEach((worker, i) => {
+                this.workers.forEach((_, i) => {
                     const progress = ((this.workerKeysTested.get(i) || 0) / this.keyGenerator.totalKeys) * 100;
-                    const progressBar = document.getElementById(`worker-${i}-progress`);
-                    const speedEl = document.getElementById(`worker-${i}-speed`);
-                    const keysEl = document.getElementById(`worker-${i}-keys`);
-                    
-                    if (progressBar) progressBar.style.width = `${progress}%`;
-                    if (speedEl) speedEl.textContent = `${this.workerSpeeds.get(i) || 0} keys/s`;
-                    if (keysEl) keysEl.textContent = `${this.workerKeysTested.get(i) || 0} keys`;
+                    const bar = document.getElementById('worker-' + i + '-progress');
+                    const spd = document.getElementById('worker-' + i + '-speed');
+                    const keys = document.getElementById('worker-' + i + '-keys');
+                    if (bar) bar.style.width = progress + '%';
+                    if (spd) spd.textContent = (this.workerSpeeds.get(i) || 0) + ' keys/s';
+                    if (keys) keys.textContent = (this.workerKeysTested.get(i) || 0) + ' keys';
                 });
                 
-                this.keyGenerator.keysByLength.forEach(lengthInfo => {
-                    const progress = (lengthInfo.nextIndex / lengthInfo.keysTotal) * 100;
-                    const progressBar = document.getElementById(`key-length-${lengthInfo.length}-progress`);
-                    const countEl = document.getElementById(`key-length-${lengthInfo.length}-count`);
-                    
-                    if (progressBar) progressBar.style.width = `${progress}%`;
-                    if (countEl) countEl.textContent = `${lengthInfo.nextIndex.toLocaleString()}/${lengthInfo.keysTotal.toLocaleString()}`;
+                this.keyGenerator.keysByLength.forEach(info => {
+                    const progress = (info.nextIndex / info.keysTotal) * 100;
+                    const bar = document.getElementById('key-length-' + info.length + '-progress');
+                    const cnt = document.getElementById('key-length-' + info.length + '-count');
+                    if (bar) bar.style.width = progress + '%';
+                    if (cnt) cnt.textContent = info.nextIndex.toLocaleString() + '/' + info.keysTotal.toLocaleString();
                 });
                 
                 this.lastUpdateTime = now;
             }
+
             updateStatus(message, isError = false, type = '') {
-                const statusEl = document.getElementById('status');
-                statusEl.textContent = `STATUS: ${message}`;
-                statusEl.className = 'status';
-                
-                if (isError) {
-                    statusEl.classList.add('error');
-                } else if (type === 'warning') {
-                    statusEl.classList.add('warning');
-                }
+                const el = document.getElementById('status');
+                el.textContent = 'STATUS: ' + message;
+                el.className = 'status';
+                if (isError) el.classList.add('error');
+                else if (type === 'warning') el.classList.add('warning');
             }
 
             checkCompletion() {
-                const allLengthsCompleted = this.keyGenerator.keysByLength.every(
-                    lengthInfo => lengthInfo.nextIndex >= lengthInfo.keysTotal
-                );
-                
-                const allWorkersIdle = Array.from(this.workerTasks.values()).every(busy => !busy);
-
-                if (allLengthsCompleted && allWorkersIdle) {
+                const allDone = this.keyGenerator.keysByLength.every(info => info.nextIndex >= info.keysTotal);
+                const allIdle = Array.from(this.workerTasks.values()).every(b => !b);
+                if (allDone && allIdle) {
                     this.stopAttack();
-                    this.updateStatus("CRACKING SEQUENCE COMPLETE");
-                    
-                    if (this.topResults.length === 0) {
-                        this.updateStatus("NO VALID RESULTS FOUND - TRY DIFFERENT PARAMETERS", false, 'warning');
-                    }
+                    this.updateStatus('COMPLETE');
+                    if (this.topResults.length === 0) this.updateStatus('NO RESULTS - TRY DIFFERENT PARAMETERS', false, 'warning');
                 }
             }
-
             stopAttack() {
                 this.isRunning = false;
                 clearInterval(this.updateInterval);
-                
-                this.workers.forEach(worker => {
-                    try {
-                        worker.terminate();
-                    } catch (e) {
-                        console.error("Error terminating worker:", e);
-                    }
-                });
-                
+                this.workers.forEach(w => { try { w.terminate(); } catch(e) {} });
                 this.workers = [];
-                this.updateStatus("READY FOR OPERATION");
-                
+                this.updateStatus('READY');
                 document.getElementById('start').disabled = false;
                 document.getElementById('stop').disabled = true;
             }
 
             formatTime(seconds) {
-                if (seconds <= 0) return '-';                
-                const days = Math.floor(seconds / 86400);
-                const hrs = Math.floor((seconds % 86400) / 3600);
-                const mins = Math.floor((seconds % 3600) / 60);
-                const secs = Math.floor(seconds % 60);
-                
-                let timeStr = '';
-                if (days > 0) timeStr += `${days}d `;
-                if (hrs > 0 || days > 0) timeStr += `${hrs}h `;
-                if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
-                timeStr += `${secs}s`;
-                
-                return timeStr.trim();
+                if (seconds <= 0) return '-';
+                const d = Math.floor(seconds / 86400);
+                const h = Math.floor((seconds % 86400) / 3600);
+                const m = Math.floor((seconds % 3600) / 60);
+                const s = Math.floor(seconds % 60);
+                return (d > 0 ? d + 'd ' : '') + (h > 0 || d > 0 ? h + 'h ' : '') + (m > 0 || h > 0 || d > 0 ? m + 'm ' : '') + s + 's';
             }
         }
 
-        // ======================
-        // OPTIMIZED KEY GENERATION SYSTEM
-        // ======================
         class KeyGenerator {
             constructor() {
                 this.alphabet = "";
@@ -969,32 +677,20 @@
                 this.keysByLength = [];
                 this.totalKeys = 0;
                 this.currentIndex = 0;
-                
                 for (let len = minKeyLength; len <= maxKeyLength; len++) {
                     const keysAtLength = Math.pow(this.alphabetSize, len);
-                    this.keysByLength.push({
-                        length: len,
-                        startIndex: this.totalKeys,
-                        endIndex: this.totalKeys + keysAtLength - 1,
-                        keysTotal: keysAtLength,
-                        nextIndex: 0
-                    });                    this.totalKeys += keysAtLength;
+                    this.keysByLength.push({ length: len, startIndex: this.totalKeys, endIndex: this.totalKeys + keysAtLength - 1, keysTotal: keysAtLength, nextIndex: 0 });
+                    this.totalKeys += keysAtLength;
                 }
             }
 
-            getNextBatchForWorker(workerId, batchSize) {
-                if (!this.workerAssignments.has(workerId)) {
+            getNextBatchForWorker(workerId, batchSize) {                if (!this.workerAssignments.has(workerId)) {
                     const lengthIndex = workerId % this.keysByLength.length;
-                    this.workerAssignments.set(workerId, {
-                        lengthIndex,
-                        nextIndex: this.keysByLength[lengthIndex].nextIndex
-                    });
+                    this.workerAssignments.set(workerId, { lengthIndex, nextIndex: this.keysByLength[lengthIndex].nextIndex });
                 }
-                
                 const assignment = this.workerAssignments.get(workerId);
                 const lengthInfo = this.keysByLength[assignment.lengthIndex];
                 const remaining = lengthInfo.keysTotal - assignment.nextIndex;
-                
                 if (remaining <= 0) {
                     for (let i = 0; i < this.keysByLength.length; i++) {
                         const li = this.keysByLength[i];
@@ -1005,49 +701,38 @@
                         }
                     }
                 }
-                
-                const actualBatchSize = Math.min(batchSize, lengthInfo.keysTotal - assignment.nextIndex);
+                const actualBatchSize = Math.min(batchSize, this.keysByLength[assignment.lengthIndex].keysTotal - assignment.nextIndex);
                 if (actualBatchSize <= 0) return [];
-                
                 const batch = [];
                 const startIdx = assignment.nextIndex;
                 const endIdx = startIdx + actualBatchSize;
-                
                 for (let i = startIdx; i < endIdx; i++) {
-                    batch.push(this.generateKeyForLength(lengthInfo.length, i));
+                    batch.push(this.generateKeyForLength(this.keysByLength[assignment.lengthIndex].length, i));
                 }
-                
                 assignment.nextIndex = endIdx;
-                lengthInfo.nextIndex = endIdx;
+                this.keysByLength[assignment.lengthIndex].nextIndex = endIdx;
                 this.currentIndex += actualBatchSize;
-                
                 return batch;
             }
 
             generateKeyForLength(length, index) {
                 let key = "";
                 let remaining = index;
-                                for (let i = 0; i < length; i++) {
+                for (let i = 0; i < length; i++) {
                     const pos = remaining % this.alphabetSize;
                     key = this.alphabet.charAt(pos) + key;
                     remaining = Math.floor(remaining / this.alphabetSize);
                 }
-                
                 return key;
             }
         }
 
-        // ======================
-        // INITIALIZE THE SYSTEM
-        // ======================
         document.addEventListener('DOMContentLoaded', () => {
             const cracker = new VigenereCracker();
-            
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 window.cracker = cracker;
-                console.log('VigenereCracker instance available as window.cracker');
+                console.log('VigenereCracker available as window.cracker');
             }
-        });
-    </script>
+        });    </script>
 </body>
 </html>
