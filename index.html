@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Military-Grade Vigenère Cipher Cracker v7.2</title>
+    <title>Military-Grade Vigenère Cipher Cracker v7.3</title>
     <style>
         :root {
             --bg: #0a0a12;
@@ -47,8 +47,7 @@
         
         textarea, input, select {
             background: #0a0a12;
-            border: 1px solid #2a2a3a;
-            color: var(--text);
+            border: 1px solid #2a2a3a;            color: var(--text);
             padding: 10px;
             width: 100%;
             margin-bottom: 15px;
@@ -97,8 +96,7 @@
             color: white;
         }
         
-        .btn:disabled {
-            opacity: 0.6;
+        .btn:disabled {            opacity: 0.6;
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
@@ -146,16 +144,62 @@
         }
         
         .result {
-            padding: 12px;
-            margin-bottom: 8px;
-            background: rgba(56, 176, 0, 0.1);
+            padding: 15px;
+            margin-bottom: 10px;            background: rgba(56, 176, 0, 0.05);
             border-left: 4px solid var(--success);
             border-radius: 0 4px 4px 0;
             transition: all 0.3s;
         }
         
         .result:hover {
-            background: rgba(56, 176, 0, 0.2);
+            background: rgba(56, 176, 0, 0.15);
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            font-family: monospace;
+            font-weight: bold;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .transform-chain {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        
+        .transform-badge {
+            background: var(--accent);
+            color: #000;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .pattern-tag {
+            background: rgba(255, 158, 0, 0.3);
+            color: var(--warning);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-top: 5px;
+            display: inline-block;
+        }
+        
+        .score-detail {
+            font-size: 12px;
+            opacity: 0.8;            margin-top: 5px;
+        }
+        
+        .score-improvement {
+            color: var(--success);
+            font-weight: bold;
         }
         
         .stats-grid {
@@ -199,8 +243,7 @@
             visibility: hidden;
             width: 200px;
             background-color: #333;
-            color: #fff;
-            text-align: center;
+            color: #fff;            text-align: center;
             border-radius: 6px;
             padding: 5px;
             position: absolute;
@@ -249,8 +292,7 @@
         
         .key-length-progress {
             margin-top: 10px;
-        }
-        
+        }        
         .key-length-item {
             margin-bottom: 5px;
         }
@@ -285,8 +327,8 @@
 <body>
     <div class="container">
         <div class="panel">
-            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.2 ▪</h1>
-            <p>Advanced brute-force attack system for decrypting Vigenère cipher messages without the key</p>
+            <h1>▪ MILITARY-GRADE VIGENÈRE CIPHER CRACKER v7.3 ▪</h1>
+            <p>Advanced brute-force attack system with adaptive pattern detection and auto-transformations</p>
             
             <label for="ciphertext">Ciphertext:</label>
             <textarea id="ciphertext" rows="5" placeholder="Enter ciphertext (letters only, no spaces or punctuation)...">OBKRUOXOGHULBSOLIFBBWFLRVQQPRNGKSSOTWTQSJQSSEKZZWATJKLUDIAWINFBNYPVTTMZFPKWGDKZXTJCDIGKUHUAUEKCAR</textarea>
@@ -299,8 +341,7 @@
                     <input type="text" id="known-text" placeholder="BERLIN,EAST,NORTH,CLOCK" value="BERLIN,EAST,NORTH,CLOCK">
                 </div>
                 <div>
-                    <label for="key-length">Key length range: <span class="tooltip">(?)
-                        <span class="tooltiptext">Range of key lengths to test (most common are 3-12)</span>
+                    <label for="key-length">Key length range: <span class="tooltip">(?)                        <span class="tooltiptext">Range of key lengths to test (most common are 3-12)</span>
                     </span></label>
                     <div style="display: flex; gap: 10px;">
                         <input type="number" id="min-key-length" value="3" min="1" max="50" style="width: 50%;">
@@ -312,7 +353,7 @@
             <div class="settings-toggle" id="settings-toggle">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                 </svg>
                 <span>Advanced Settings</span>
             </div>
@@ -335,7 +376,7 @@
                 <div class="input-grid">
                     <div>
                         <label for="worker-count">Worker Count: <span class="tooltip">(?)
-                            <span class="tooltiptext">Number of parallel workers (default: 900% of CPU cores)</span>
+                            <span class="tooltiptext">Number of parallel workers (default: 90% of CPU cores)</span>
                         </span></label>
                         <input type="number" id="worker-count" value="0" min="1" max="32">
                     </div>
@@ -349,8 +390,7 @@
             </div>
 
             <div style="margin-top: 15px;">
-                <button id="start" class="btn btn-start">INITIATE ATTACK SEQUENCE</button>
-                <button id="stop" class="btn btn-stop" disabled>TERMINATE PROCESS</button>
+                <button id="start" class="btn btn-start">INITIATE ATTACK SEQUENCE</button>                <button id="stop" class="btn btn-stop" disabled>TERMINATE PROCESS</button>
             </div>
         </div>
 
@@ -386,7 +426,7 @@
 
         <div class="panel">
             <h2>▪ TOP DECRYPTION RESULTS ▪</h2>
-            <p>Sorted by probability score (higher is better)</p>
+            <p>Sorted by probability score (higher is better). Results may include auto-applied transformations.</p>
             <div id="results"></div>
         </div>
     </div>
@@ -399,8 +439,7 @@
             constructor() {
                 this.workers = [];
                 this.keysTested = 0;
-                this.startTime = 0;
-                this.isRunning = false;
+                this.startTime = 0;                this.isRunning = false;
                 this.topResults = [];
                 this.workerSpeeds = new Map();
                 this.workerKeysTested = new Map();
@@ -449,19 +488,16 @@
                     if (maxLen >= 8) {
                         this.updateStatus(`WARNING: Testing keys up to ${maxLen} characters may take a very long time.`, false, 'warning');
                     }
-                };
-                
+                };                
                 minKeyLength.addEventListener('change', updateTotalKeys);
                 maxKeyLength.addEventListener('change', updateTotalKeys);
                 
-                // Initialize total keys display
                 updateTotalKeys();
             }
 
             getCurrentAlphabet() {
                 const customAlphabet = document.getElementById('custom-alphabet').value.trim().toUpperCase();
                 if (customAlphabet && customAlphabet.length > 0) {
-                    // Remove duplicates and sort
                     const uniqueChars = [...new Set(customAlphabet.split(''))].sort();
                     return uniqueChars.join('');
                 }
@@ -473,7 +509,6 @@
                     return { valid: false, message: "Alphabet cannot be empty" };
                 }
                 
-                // Check for duplicates
                 const uniqueChars = new Set(alphabet);
                 if (uniqueChars.size !== alphabet.length) {
                     return { valid: false, message: "Alphabet contains duplicate characters" };
@@ -485,8 +520,6 @@
             getWorkerCount() {
                 const inputCount = parseInt(document.getElementById('worker-count').value);
                 if (inputCount > 0) return inputCount;
-                
-                // Default to 90% of available cores
                 return Math.max(1, Math.floor((navigator.hardwareConcurrency || 4) * 0.90));
             }
 
@@ -499,21 +532,17 @@
             }
 
             async startAttack() {
-                // Validate input
                 const ciphertext = document.getElementById('ciphertext').value.trim().replace(/\s+/g, '').toUpperCase();
                 const knownText = document.getElementById('known-text').value.toUpperCase();
                 const minKeyLength = parseInt(document.getElementById('min-key-length').value) || 3;
                 const maxKeyLength = parseInt(document.getElementById('max-key-length').value) || 12;
                 const alphabet = this.getCurrentAlphabet();
-                
-                // Validate alphabet first
-                const alphabetValidation = this.validateAlphabet(alphabet);
+                                const alphabetValidation = this.validateAlphabet(alphabet);
                 if (!alphabetValidation.valid) {
                     this.updateStatus(`ERROR: ${alphabetValidation.message}`, true);
                     return;
                 }
                 
-                // Validate ciphertext contains only letters from alphabet
                 if (!ciphertext) {
                     this.updateStatus("ERROR: No ciphertext provided", true);
                     return;
@@ -530,7 +559,6 @@
                     return;
                 }
 
-                // Initialize attack
                 this.stopAttack();
                 this.isRunning = true;
                 this.keysTested = 0;
@@ -542,7 +570,6 @@
                 this.lastUpdateTime = this.startTime;
                 this.workerTasks = new Map();
                 
-                // Update UI
                 this.updateStatus("INITIALIZING CRACKING SEQUENCE...");
                 document.getElementById('results').innerHTML = '';
                 document.getElementById('workers').innerHTML = '';
@@ -550,21 +577,16 @@
                 document.getElementById('start').disabled = true;
                 document.getElementById('stop').disabled = false;
 
-                // Initialize key generator
                 this.keyGenerator.init(alphabet, minKeyLength, maxKeyLength);
                 document.getElementById('total-keys').textContent = this.keyGenerator.totalKeys.toLocaleString();
 
-                // Create key length progress bars
                 this.createKeyLengthProgressBars(minKeyLength, maxKeyLength);
 
-                // Create workers
                 const workerCount = this.getWorkerCount();
                 await this.createWorkers(workerCount, ciphertext, knownText, alphabet);
 
-                // Start monitoring
                 this.updateInterval = setInterval(() => this.updateDashboard(), 250);
             }
-
             createKeyLengthProgressBars(minLen, maxLen) {
                 const container = document.getElementById('key-length-progress');
                 
@@ -598,7 +620,7 @@
                 for (let i = 0; i < count; i++) {
                     try {
                         const worker = new Worker('vigenere-worker.js');
-                        this.workerTasks.set(i, false); // Mark worker as idle
+                        this.workerTasks.set(i, false);
                         
                         worker.postMessage({
                             type: 'init',
@@ -613,37 +635,29 @@
                         worker.onmessage = (e) => {
                             if (!this.isRunning) return;
                             
-                            const { keysTested, results, currentSpeed, workerId } = e.data;
-                            
-                            // Update worker-specific metrics
+                            const { keysTested, results, currentSpeed, workerId } = e.data;                            
                             this.workerSpeeds.set(workerId, currentSpeed || 0);
                             this.workerKeysTested.set(workerId, (this.workerKeysTested.get(workerId) || 0) + keysTested);
-                            
-                            // Aggregate results
                             this.keysTested += keysTested;
                             
                             if (results && results.length > 0) {
                                 this.processResults(results);
                             }
                             
-                            // Mark worker as idle
                             this.workerTasks.set(workerId, false);
-                            
-                            // Assign more work
                             this.assignWork(workerId, ciphertext);
                         };
 
                         worker.onerror = (e) => {
                             console.error(`Worker ${i} error:`, e);
                             this.updateStatus(`Worker ${i+1} encountered an error`, true);
-                            this.workerTasks.set(i, false); // Mark as idle even on error
+                            this.workerTasks.set(i, false);
                         };
 
                         this.workers[i] = worker;
                         this.workerSpeeds.set(i, 0);
                         this.workerKeysTested.set(i, 0);
                         
-                        // Create worker UI
                         const workerEl = document.createElement('div');
                         workerEl.className = 'worker';
                         workerEl.innerHTML = `
@@ -656,7 +670,6 @@
                         `;
                         workerContainer.appendChild(workerEl);
 
-                        // Start first batch
                         this.assignWork(i, ciphertext);
                     } catch (e) {
                         console.error(`Failed to create worker ${i}:`, e);
@@ -666,13 +679,12 @@
 
             assignWork(workerId, ciphertext) {
                 if (!this.isRunning || !this.workers[workerId] || this.workerTasks.get(workerId)) {
-                    return; // Worker is busy or not available
+                    return;
                 }
                 
                 const batch = this.keyGenerator.getNextBatchForWorker(workerId, this.getBatchSize());
                 
-                if (batch.length > 0) {
-                    this.workerTasks.set(workerId, true); // Mark worker as busy
+                if (batch.length > 0) {                    this.workerTasks.set(workerId, true);
                     this.workers[workerId].postMessage({
                         type: 'process',
                         ciphertext: ciphertext,
@@ -702,7 +714,10 @@
                                     key: result.key,
                                     plaintext: result.plaintext,
                                     score: score,
-                                    timestamp: now
+                                    timestamp: now,
+                                    transforms: result.transforms || [],
+                                    patterns: result.patterns || [],
+                                    baseScore: result.baseScore || score
                                 };
                             }
                         } else {
@@ -710,13 +725,15 @@
                                 key: result.key,
                                 plaintext: result.plaintext,
                                 score: score,
-                                timestamp: now
+                                timestamp: now,
+                                transforms: result.transforms || [],
+                                patterns: result.patterns || [],
+                                baseScore: result.baseScore || score
                             });
                         }
                         
                         this.topResults.sort((a, b) => {
-                            if (b.score !== a.score) return b.score - a.score;
-                            return b.timestamp - a.timestamp;
+                            if (b.score !== a.score) return b.score - a.score;                            return b.timestamp - a.timestamp;
                         });
                         
                         if (this.topResults.length > 15) {
@@ -759,6 +776,22 @@
                         div.style.background = 'rgba(255, 158, 0, 0.1)';
                     }
                     
+                    const transformsHtml = result.transforms && result.transforms.length > 0
+                        ? `<div class="transform-chain">${result.transforms.map(t => 
+                            `<span class="transform-badge">${t}</span>`).join('')}</div>`
+                        : '';
+                    
+                    const patternsHtml = result.patterns && result.patterns.length > 0
+                        ? `<div class="pattern-tag">Patterns: ${result.patterns.join(', ')}</div>`                        : '';
+                    
+                    let scoreDisplay = `${result.score.toFixed(2)}`;
+                    if (result.baseScore && result.transforms.length > 0) {
+                        const improvement = (result.score - result.baseScore).toFixed(2);
+                        if (improvement > 0) {
+                            scoreDisplay += ` <span class="score-improvement">(base: ${result.baseScore.toFixed(2)} +${improvement})</span>`;
+                        }
+                    }
+                    
                     const displayText = result.plaintext.length > 100 
                         ? result.plaintext.substring(0, 100) + '...' 
                         : result.plaintext;
@@ -766,9 +799,13 @@
                     const highlightedText = this.highlightMatches(displayText, knownText);
                     
                     div.innerHTML = `
-                        <div><strong>Key:</strong> ${result.key}</div>
-                        <div><strong>Score:</strong> ${result.score.toFixed(2)}</div>
-                        <div><strong>Plaintext:</strong> ${highlightedText}</div>
+                        <div class="result-header">
+                            <span>KEY: ${result.key}</span>
+                            <span>SCORE: ${scoreDisplay}</span>
+                        </div>
+                        ${transformsHtml}
+                        <div style="margin:8px 0; word-break: break-all;">${highlightedText}</div>
+                        ${patternsHtml}
                     `;
                     
                     fragment.appendChild(div);
@@ -784,7 +821,6 @@
                 const now = Date.now();
                 const timeElapsed = (now - this.lastUpdateTime) / 1000;
                 
-                // Calculate total speed from all workers
                 let totalSpeed = 0;
                 let totalKeys = 0;
                 this.workerSpeeds.forEach((speed, workerId) => {
@@ -794,31 +830,25 @@
                 
                 this.keysTested = totalKeys;
                 
-                // Update speed samples for smoothing
                 if (totalSpeed > 0) {
-                    this.speedSamples.push(totalSpeed);
-                    if (this.speedSamples.length > this.maxSpeedSamples) {
+                    this.speedSamples.push(totalSpeed);                    if (this.speedSamples.length > this.maxSpeedSamples) {
                         this.speedSamples.shift();
                     }
                 }
                 
-                // Calculate smoothed speed
                 const smoothedSpeed = this.speedSamples.length > 0 
                     ? Math.round(this.speedSamples.reduce((sum, speed) => sum + speed, 0) / this.speedSamples.length)
                     : 0;
                 
-                // Update UI
                 document.getElementById('keys-tried').textContent = this.keysTested.toLocaleString();
                 document.getElementById('speed').textContent = `${smoothedSpeed.toLocaleString()} keys/sec`;
                 
-                // Update ETA
                 if (smoothedSpeed > 0) {
                     const remainingKeys = this.keyGenerator.totalKeys - this.keyGenerator.currentIndex;
                     const etaSeconds = Math.round(remainingKeys / smoothedSpeed);
                     document.getElementById('eta').textContent = this.formatTime(etaSeconds);
                 }
                 
-                // Update worker progress and stats
                 this.workers.forEach((worker, i) => {
                     const progress = ((this.workerKeysTested.get(i) || 0) / this.keyGenerator.totalKeys) * 100;
                     const progressBar = document.getElementById(`worker-${i}-progress`);
@@ -830,7 +860,6 @@
                     if (keysEl) keysEl.textContent = `${this.workerKeysTested.get(i) || 0} keys`;
                 });
                 
-                // Update key length progress
                 this.keyGenerator.keysByLength.forEach(lengthInfo => {
                     const progress = (lengthInfo.nextIndex / lengthInfo.keysTotal) * 100;
                     const progressBar = document.getElementById(`key-length-${lengthInfo.length}-progress`);
@@ -851,17 +880,14 @@
                 if (isError) {
                     statusEl.classList.add('error');
                 } else if (type === 'warning') {
-                    statusEl.classList.add('warning');
-                }
+                    statusEl.classList.add('warning');                }
             }
 
             checkCompletion() {
-                // Check if all key lengths are completed
                 const allLengthsCompleted = this.keyGenerator.keysByLength.every(
                     lengthInfo => lengthInfo.nextIndex >= lengthInfo.keysTotal
                 );
                 
-                // Check if all workers are idle
                 const allWorkersIdle = Array.from(this.workerTasks.values()).every(busy => !busy);
 
                 if (allLengthsCompleted && allWorkersIdle) {
@@ -878,7 +904,6 @@
                 this.isRunning = false;
                 clearInterval(this.updateInterval);
                 
-                // Terminate all workers
                 this.workers.forEach(worker => {
                     try {
                         worker.terminate();
@@ -890,7 +915,6 @@
                 this.workers = [];
                 this.updateStatus("READY FOR OPERATION");
                 
-                // Update UI controls
                 document.getElementById('start').disabled = false;
                 document.getElementById('stop').disabled = true;
             }
@@ -905,8 +929,7 @@
                 
                 let timeStr = '';
                 if (days > 0) timeStr += `${days}d `;
-                if (hrs > 0 || days > 0) timeStr += `${hrs}h `;
-                if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
+                if (hrs > 0 || days > 0) timeStr += `${hrs}h `;                if (mins > 0 || hrs > 0 || days > 0) timeStr += `${mins}m `;
                 timeStr += `${secs}s`;
                 
                 return timeStr.trim();
@@ -938,7 +961,6 @@
                 this.totalKeys = 0;
                 this.currentIndex = 0;
                 
-                // Precompute keys by length
                 for (let len = minKeyLength; len <= maxKeyLength; len++) {
                     const keysAtLength = Math.pow(this.alphabetSize, len);
                     this.keysByLength.push({
@@ -954,11 +976,9 @@
 
             getNextBatchForWorker(workerId, batchSize) {
                 if (!this.workerAssignments.has(workerId)) {
-                    // Assign this worker to a specific key length
                     const lengthIndex = workerId % this.keysByLength.length;
                     this.workerAssignments.set(workerId, {
-                        lengthIndex,
-                        nextIndex: this.keysByLength[lengthIndex].nextIndex
+                        lengthIndex,                        nextIndex: this.keysByLength[lengthIndex].nextIndex
                     });
                 }
                 
@@ -967,7 +987,6 @@
                 const remaining = lengthInfo.keysTotal - assignment.nextIndex;
                 
                 if (remaining <= 0) {
-                    // This worker finished its key length, find next available
                     for (let i = 0; i < this.keysByLength.length; i++) {
                         const li = this.keysByLength[i];
                         if (li.nextIndex < li.keysTotal) {
@@ -1009,14 +1028,12 @@
                 return key;
             }
         }
-
         // ======================
         // INITIALIZE THE SYSTEM
         // ======================
         document.addEventListener('DOMContentLoaded', () => {
             const cracker = new VigenereCracker();
             
-            // For debugging/development access
             if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                 window.cracker = cracker;
                 console.log('VigenereCracker instance available as window.cracker');
