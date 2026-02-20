@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vigenère K4 Cracker</title>
+    <title>Vigenère K4 Cracker - Optimized</title>
     <style>
         :root {
             --bg: #0a0a12; --panel: #1a1a2e; --accent: #4cc9f0;
@@ -47,7 +47,8 @@
             padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; flex-wrap: wrap; gap: 10px;
         }
         .worker-progress { flex-grow: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; min-width: 150px; }
-        .progress-bar { height: 100%; background: var(--accent); transition: width 0.3s; }        .result {
+        .progress-bar { height: 100%; background: var(--accent); transition: width 0.3s; }
+        .result {
             padding: 15px; margin-bottom: 10px; background: rgba(56,176,0,0.05);
             border-left: 4px solid var(--success); border-radius: 0 4px 4px 0; transition: all 0.3s;
         }
@@ -93,29 +94,27 @@
     <div class="container">
         <div class="panel">
             <h1>▪ VIGENÈRE K4 CRACKER ▪</h1>
-            <p>Optimized for Kryptos K4. Runs entirely in browser via Web Workers.</p>
+            <p>Optimized for speed. Runs entirely in browser via Web Workers.</p>
             
-            <!-- === ШИФРОТЕКСТ === -->
-            <label for="ciphertext">Ciphertext:</label>            <textarea id="ciphertext" rows="5">OBKRUOXOGHULBSOLIFBBWFLRVQQPRNGKSSOTWTQSJQSSEKZZWATJKLUDIAWINFBNYPVTTMZFPKWGDKZXTJCDIGKUHUAUEKCAR</textarea>
+            <label for="ciphertext">Ciphertext:</label>
+            <textarea id="ciphertext" rows="5">OBKRUOXOGHULBSOLIFBBWFLRVQQPRNGKSSOTWTQSJQSSEKZZWATJKLUDIAWINFBNYPVTTMZFPKWGDKZXTJCDIGKUHUAUEKCAR</textarea>
             <div class="input-hint">Length: <span id="cipher-length">0</span> characters</div>
             
-            <!-- === АЛФАВИТ (НА ВИДУ!) === -->
             <div class="section-divider"></div>
-            <label for="custom-alphabet" style="color: var(--accent); font-weight: bold;">🔤 ALPHABET (Critical for K4):</label>
+            <label for="custom-alphabet" style="color: var(--accent); font-weight: bold;">🔤 ALPHABET:</label>
             <input type="text" id="custom-alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" style="font-family: monospace; letter-spacing: 2px;">
-            <button type="button" class="btn btn-secondary" id="alphabet-preview-btn" style="padding: 5px 10px; font-size: 0.9em;">Preview Alphabet</button>
+            <button type="button" class="btn btn-secondary" id="alphabet-preview-btn" style="padding: 5px 10px; font-size: 0.9em;">Preview</button>
             <div id="alphabet-preview">26 chars: ABCDEFGHIJKLMNOPQRSTUVWXYZ</div>
             <div class="checkbox-group">
-                <label><input type="checkbox" id="alphabet-auto-clean" checked> Auto-clean non-alphabet chars from CT</label>
-                <label><input type="checkbox" id="alphabet-to-upper" checked> Force uppercase</label>
-                <label><input type="checkbox" id="alphabet-remove-dupes" checked> Remove duplicate chars</label>
+                <label><input type="checkbox" id="alphabet-auto-clean" checked> Auto-clean CT</label>
+                <label><input type="checkbox" id="alphabet-to-upper" checked> Uppercase</label>
+                <label><input type="checkbox" id="alphabet-remove-dupes" checked> No Dupes</label>
             </div>
             
-            <!-- === ИЗВЕСТНЫЕ ФРАГМЕНТЫ === -->
             <div class="section-divider"></div>
             <div class="input-grid">
                 <div>
-                    <label for="known-text">Known Fragments (highlighted in results):</label>
+                    <label for="known-text">Known Fragments:</label>
                     <input type="text" id="known-text" value="BERLIN,CLOCK,NORTHEAST,EAST,LAYER,FOUR">
                 </div>
                 <div>
@@ -127,10 +126,9 @@
                 </div>
             </div>
 
-            <!-- === ДОП. НАСТРОЙКИ (СКРЫТЫ) === -->
             <div class="settings-toggle" id="settings-toggle">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                <span>Advanced Settings (Workers, Variants, K4 Mode)</span>
+                <span>Advanced Settings</span>
             </div>
 
             <div class="settings-panel" id="settings-panel">
@@ -145,7 +143,8 @@
                     </div>
                 </div>
                 <div class="input-grid">
-                    <div>                        <label for="score-threshold">Score Threshold:</label>
+                    <div>
+                        <label for="score-threshold">Score Threshold:</label>
                         <input type="number" id="score-threshold" value="1.0" min="0.1" max="10" step="0.1">
                     </div>
                     <div>
@@ -194,7 +193,8 @@
                 </div>
             </div>
 
-            <div class="section-divider"></div>            <div style="margin-top: 15px;">
+            <div class="section-divider"></div>
+            <div style="margin-top: 15px;">
                 <button id="start" class="btn btn-start">🚀 START ATTACK</button>
                 <button id="stop" class="btn btn-stop" disabled>⏹ STOP</button>
                 <button id="reset" class="btn btn-secondary">🔄 RESET</button>
@@ -243,7 +243,8 @@
             const previewEl = document.getElementById('alphabet-preview');
             
             const updatePreview = () => {
-                const raw = alphabetInput.value;                const processed = this.processAlphabet(raw);
+                const raw = alphabetInput.value;
+                const processed = this.processAlphabet(raw);
                 previewEl.textContent = `${processed.length} chars: ${processed}`;
                 previewEl.style.color = processed.length > 0 ? 'var(--accent)' : 'var(--danger)';
             };
@@ -264,12 +265,33 @@
                 const minLen = parseInt(document.getElementById('min-key-length').value) || 3;
                 const maxLen = parseInt(document.getElementById('max-key-length').value) || 12;
                 const alphabet = this.getCurrentAlphabet();
+                
                 let totalKeys = 0;
-                for (let len = minLen; len <= maxLen; len++) totalKeys += Math.pow(alphabet.length, len);
-                document.getElementById('total-keys').textContent = totalKeys.toLocaleString();
+                const safeMax = Math.min(maxLen, 10);
+                
+                for (let len = minLen; len <= safeMax; len++) {
+                    totalKeys += Math.pow(alphabet.length, len);
+                }
+                
+                if (maxLen > 10) {
+                    document.getElementById('total-keys').textContent = "999B+ (Huge)";
+                } else {
+                    document.getElementById('total-keys').textContent = totalKeys.toLocaleString();
+                }
+                
+                if (maxLen >= 8) {
+                    this.updateStatus('WARNING: Long keys take time.', false, 'warning');
+                }
             };
-            document.getElementById('min-key-length').addEventListener('change', updateTotalKeys);
-            document.getElementById('max-key-length').addEventListener('change', updateTotalKeys);
+            
+            let timeout;
+            const debouncedUpdate = () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(updateTotalKeys, 300);
+            };
+            
+            document.getElementById('min-key-length').addEventListener('change', debouncedUpdate);
+            document.getElementById('max-key-length').addEventListener('change', debouncedUpdate);
             updateTotalKeys();
         }
 
@@ -292,7 +314,8 @@
         }
 
         validateAlphabet(alphabet) {
-            if (!alphabet || alphabet.length === 0) return { valid: false, message: "Alphabet empty" };            if (new Set(alphabet).size !== alphabet.length) return { valid: false, message: "Duplicate chars" };
+            if (!alphabet || alphabet.length === 0) return { valid: false, message: "Alphabet empty" };
+            if (new Set(alphabet).size !== alphabet.length) return { valid: false, message: "Duplicate chars" };
             return { valid: true };
         }
 
@@ -341,7 +364,8 @@
                 tryAlphabetShift: document.getElementById('variant-alphabet-shift').checked,
                 mutateKeyShift: document.getElementById('mutate-key-shift')?.checked || false,
                 mutateKeyReverse: document.getElementById('mutate-key-reverse')?.checked || false
-            };        }
+            };
+        }
 
         async startAttack() {
             const rawCiphertext = document.getElementById('ciphertext').value.trim().replace(/\s+/g, '').toUpperCase();
@@ -370,7 +394,10 @@
             document.getElementById('start').disabled = true; document.getElementById('stop').disabled = false;
 
             this.keyGenerator.init(alphabet, minKeyLength, maxKeyLength);
-            document.getElementById('total-keys').textContent = this.keyGenerator.totalKeys.toLocaleString();
+            
+            const totalDisplay = maxKeyLength > 10 ? "999B+ (Huge)" : this.keyGenerator.totalKeys.toLocaleString();
+            document.getElementById('total-keys').textContent = totalDisplay;
+            
             this.createKeyLengthProgressBars(minKeyLength, maxKeyLength);
 
             const workerCount = this.getWorkerCount();
@@ -389,8 +416,14 @@
         }
 
         async createWorkers(count, ciphertext, knownText, alphabet, specificKeys) {
-            this.workers = []; this.workerSpeeds = new Map(); this.workerKeysTested = new Map(); this.workerTasks = new Map();
-            const workerContainer = document.getElementById('workers'); workerContainer.innerHTML = '';            const batchSize = this.getBatchSize(); const scoreThreshold = this.getScoreThreshold();
+            this.workers = []; 
+            this.workerSpeeds = new Map(); 
+            this.workerKeysTested = new Map(); 
+            this.workerTasks = new Map();
+            const workerContainer = document.getElementById('workers'); 
+            workerContainer.innerHTML = '';
+            const batchSize = this.getBatchSize(); 
+            const scoreThreshold = this.getScoreThreshold();
             
             const enableK4Mode = document.getElementById('enable-k4-mode')?.checked || false;
             const autoTransform = document.getElementById('auto-transform')?.checked || true;
@@ -399,11 +432,12 @@
             const attackVariants = this.getAttackVariantFlags();
 
             for (let i = 0; i < count; i++) {
+                if (i % 2 === 0) await new Promise(r => setTimeout(r, 0));
+                
                 try {
                     const worker = new Worker('vigenere-worker.js');
                     this.workerTasks.set(i, false);
                     
-                    // ✅ ОТПРАВЛЯЕМ АЛФАВИТ ИЗ HTML В ВОРКЕР
                     worker.postMessage({
                         type: 'init', workerId: i, alphabet: alphabet, ciphertext: ciphertext,
                         ciphertextLength: ciphertext.length, knownText: knownText, batchSize: batchSize,
@@ -430,16 +464,22 @@
                         this.workerTasks.set(i, false);
                     };
 
-                    this.workers[i] = worker; this.workerSpeeds.set(i, 0); this.workerKeysTested.set(i, 0);
-                    const workerEl = document.createElement('div'); workerEl.className = 'worker';
+                    this.workers[i] = worker; 
+                    this.workerSpeeds.set(i, 0); 
+                    this.workerKeysTested.set(i, 0);
+                    
+                    const workerEl = document.createElement('div'); 
+                    workerEl.className = 'worker';
                     workerEl.innerHTML = `<span>WORKER ${i+1}</span><div class="worker-progress"><div class="progress-bar" id="worker-${i}-progress" style="width:0%"></div></div><span id="worker-${i}-speed">0 keys/s</span><span id="worker-${i}-keys">0 keys</span>`;
                     workerContainer.appendChild(workerEl);
+                    
                     this.assignWork(i, ciphertext);
                 } catch (e) { console.error('Failed to create worker:', e); }
             }
         }
 
-        assignWork(workerId, ciphertext) {            if (!this.isRunning || !this.workers[workerId] || this.workerTasks.get(workerId)) return;
+        assignWork(workerId, ciphertext) {
+            if (!this.isRunning || !this.workers[workerId] || this.workerTasks.get(workerId)) return;
             const batch = this.keyGenerator.getNextBatchForWorker(workerId, this.getBatchSize());
             if (batch.length > 0) {
                 this.workerTasks.set(workerId, true);
@@ -488,7 +528,8 @@
                     if (result.autoDetected) attackHtml += `<span class="auto-detected-badge">🔍</span>`;
                 }
                 const transformsHtml = result.transforms && result.transforms.length > 0 ? '<div class="transform-chain">' + result.transforms.map(t => `<span class="transform-badge">${t}</span>`).join('') + '</div>' : '';
-                const patternsHtml = result.patterns && result.patterns.length > 0 ? '<div class="pattern-tag">Patterns: ' + result.patterns.join(', ') + '</div>' : '';                let scoreDisplay = result.score.toFixed(2);
+                const patternsHtml = result.patterns && result.patterns.length > 0 ? '<div class="pattern-tag">Patterns: ' + result.patterns.join(', ') + '</div>' : '';
+                let scoreDisplay = result.score.toFixed(2);
                 if (result.baseScore && result.transforms && result.transforms.length > 0) {
                     const improvement = (result.score - result.baseScore).toFixed(2);
                     if (improvement > 0) scoreDisplay += ` <span class="score-improvement">(base: ${result.baseScore.toFixed(2)} +${improvement})</span>`;
@@ -537,7 +578,8 @@
             if (isError) el.classList.add('error'); else if (type === 'warning') el.classList.add('warning');
         }
 
-        checkCompletion() {            const allDone = this.keyGenerator.keysByLength.every(info => info.nextIndex >= info.keysTotal);
+        checkCompletion() {
+            const allDone = this.keyGenerator.keysByLength.every(info => info.nextIndex >= info.keysTotal);
             const allIdle = Array.from(this.workerTasks.values()).every(b => !b);
             if (allDone && allIdle) { this.stopAttack(); this.updateStatus('COMPLETE'); }
         }
@@ -566,40 +608,80 @@
     }
 
     class KeyGenerator {
-        constructor() { this.alphabet = ""; this.minKeyLength = 0; this.maxKeyLength = 0; this.totalKeys = 0; this.currentIndex = 0; this.alphabetSize = 0; this.workerAssignments = new Map(); this.keysByLength = []; }
+        constructor() {
+            this.alphabet = "";
+            this.alphabetSize = 0;
+            this.minKeyLength = 0;
+            this.maxKeyLength = 0;
+            this.totalKeys = 0;
+            this.currentIndex = 0;
+            this.keysByLength = [];
+            this.workerAssignments = new Map();
+        }
+
         init(alphabet, minKeyLength, maxKeyLength) {
-            this.alphabet = alphabet; this.minKeyLength = minKeyLength; this.maxKeyLength = maxKeyLength;
-            this.alphabetSize = alphabet.length; this.workerAssignments = new Map(); this.keysByLength = [];
-            this.totalKeys = 0; this.currentIndex = 0;
-            for (let len = minKeyLength; len <= maxLen; len++) {
-                const keysAtLength = Math.pow(this.alphabetSize, len);
-                this.keysByLength.push({ length: len, startIndex: this.totalKeys, endIndex: this.totalKeys + keysAtLength - 1, keysTotal: keysAtLength, nextIndex: 0 });
-                this.totalKeys += keysAtLength;
+            this.alphabet = alphabet;
+            this.alphabetSize = alphabet.length;
+            this.minKeyLength = minKeyLength;
+            this.maxKeyLength = maxKeyLength;
+            this.keysByLength = [];
+            this.currentIndex = 0;
+            this.totalKeys = 0;
+            
+            for (let len = minKeyLength; len <= maxKeyLength; len++) {
+                const count = Math.pow(this.alphabetSize, len);
+                this.keysByLength.push({ 
+                    length: len, 
+                    keysTotal: count, 
+                    nextIndex: 0 
+                });
+                this.totalKeys += count;
             }
         }
+
         getNextBatchForWorker(workerId, batchSize) {
             if (!this.workerAssignments.has(workerId)) {
                 const lengthIndex = workerId % this.keysByLength.length;
-                this.workerAssignments.set(workerId, { lengthIndex, nextIndex: this.keysByLength[lengthIndex].nextIndex });
+                this.workerAssignments.set(workerId, { lengthIndex, nextIndex: 0 });
             }
+            
             const assignment = this.workerAssignments.get(workerId);
-            const lengthInfo = this.keysByLength[assignment.lengthIndex];
-            const remaining = lengthInfo.keysTotal - assignment.nextIndex;
-            if (remaining <= 0) {
-                for (let i = 0; i < this.keysByLength.length; i++) {                    const li = this.keysByLength[i];
-                    if (li.nextIndex < li.keysTotal) { assignment.lengthIndex = i; assignment.nextIndex = li.nextIndex; break; }
+            let lengthInfo = this.keysByLength[assignment.lengthIndex];
+            
+            if (assignment.nextIndex >= lengthInfo.keysTotal) {
+                for (let i = 0; i < this.keysByLength.length; i++) {
+                    if (this.keysByLength[i].nextIndex < this.keysByLength[i].keysTotal) {
+                        assignment.lengthIndex = i;
+                        assignment.nextIndex = this.keysByLength[i].nextIndex;
+                        lengthInfo = this.keysByLength[i];
+                        break;
+                    }
                 }
+                if (assignment.nextIndex >= lengthInfo.keysTotal) return [];
             }
-            const actualBatchSize = Math.min(batchSize, this.keysByLength[assignment.lengthIndex].keysTotal - assignment.nextIndex);
+
+            const actualBatchSize = Math.min(batchSize, lengthInfo.keysTotal - assignment.nextIndex);
             if (actualBatchSize <= 0) return [];
-            const batch = []; const startIdx = assignment.nextIndex; const endIdx = startIdx + actualBatchSize;
-            for (let i = startIdx; i < endIdx; i++) batch.push(this.generateKeyForLength(this.keysByLength[assignment.lengthIndex].length, i));
-            assignment.nextIndex = endIdx; this.keysByLength[assignment.lengthIndex].nextIndex = endIdx;
-            this.currentIndex += actualBatchSize; return batch;
+
+            const batch = [];
+            const startIdx = assignment.nextIndex;
+            for (let i = 0; i < actualBatchSize; i++) {
+                batch.push(this.generateKeyFast(startIdx + i, lengthInfo.length));
+            }
+            
+            assignment.nextIndex += actualBatchSize;
+            lengthInfo.nextIndex += actualBatchSize;
+            this.currentIndex += actualBatchSize;
+            return batch;
         }
-        generateKeyForLength(length, index) {
-            let key = ""; let remaining = index;
-            for (let i = 0; i < length; i++) { const pos = remaining % this.alphabetSize; key = this.alphabet.charAt(pos) + key; remaining = Math.floor(remaining / this.alphabetSize); }
+
+        generateKeyFast(index, length) {
+            let key = "";
+            let remaining = index;
+            for (let i = 0; i < length; i++) {
+                key = this.alphabet.charAt(remaining % this.alphabetSize) + key;
+                remaining = Math.floor(remaining / this.alphabetSize);
+            }
             return key;
         }
     }
@@ -611,3 +693,5 @@
     </script>
 </body>
 </html>
+
+
